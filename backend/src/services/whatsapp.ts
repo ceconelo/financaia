@@ -9,6 +9,7 @@ import { Boom } from '@hapi/boom';
 import P from 'pino';
 import qrcode from 'qrcode-terminal';
 import { handleMessage } from '../messageHandler.js';
+import { botState, io } from '../server.js';
 
 const logger = P({ level: 'silent' }); // Reduz logs verbosos
 let reconnectAttempts = 0;
@@ -40,6 +41,10 @@ export async function startWhatsAppBot() {
       console.log('2. Vá em Configurações > Aparelhos conectados');
       console.log('3. Toque em "Conectar aparelho"');
       console.log('4. Aponte a câmera para o QR Code acima\n');
+      
+      // Emitir QR code para dashboard
+      botState.qrCode = qr;
+      io.emit('qr', qr);
     }
 
     if (connection === 'close') {
@@ -48,14 +53,22 @@ export async function startWhatsAppBot() {
       
       console.log(`❌ Conexão fechada (código: ${statusCode})`);
       
+      // Atualizar estado
+      botState.connected = false;
+      botState.phoneNumber = null;
+      botState.connectedAt = null;
+      io.emit('connection-status', { connected: false, phoneNumber: null, uptime: 0 });
+      
       if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
+        botState.isReconnecting = true;
         console.log(`🔄 Tentativa de reconexão ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`);
         
         setTimeout(() => {
           startWhatsAppBot();
         }, 3000);
       } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        botState.isReconnecting = false;
         console.log('\n⚠️  Limite de reconexões atingido!');
         console.log('💡 Soluções:');
         console.log('   1. Limpe os dados: rm -rf auth_info');
@@ -63,14 +76,33 @@ export async function startWhatsAppBot() {
         console.log('   3. Verifique sua conexão com a internet\n');
         process.exit(1);
       } else {
+        botState.isReconnecting = false;
         console.log('🛑 Não reconectando (logout manual)');
       }
     } else if (connection === 'open') {
       console.log('✅ Conectado ao WhatsApp com sucesso!');
       console.log('📲 Bot está pronto para receber mensagens!\n');
+      
+      // Atualizar estado
+      botState.connected = true;
+      botState.qrCode = null;
+      botState.connectedAt = new Date();
+      botState.isReconnecting = false;
       reconnectAttempts = 0; // Reset counter on successful connection
+      
+      // Emitir status para dashboard
+      io.emit('connection-status', { 
+        connected: true, 
+        phoneNumber: sock.user?.id?.split(':')[0] || null,
+        uptime: 0
+      });
+      
+      if (sock.user?.id) {
+        botState.phoneNumber = sock.user.id.split(':')[0];
+      }
     } else if (connection === 'connecting') {
       console.log('🔄 Conectando ao WhatsApp...');
+      io.emit('connection-status', { connected: false, connecting: true });
     }
   });
 

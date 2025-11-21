@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { startWhatsAppBot } from './services/whatsapp.js';
+import { startAPIServer } from './server.js';
 
 async function main() {
   console.log('🚀 Iniciando FinancaIA Bot...\n');
@@ -10,7 +11,13 @@ async function main() {
   }
 
   try {
-    await startWhatsAppBot();
+    // Iniciar API Server primeiro
+    startAPIServer();
+    
+    // Depois iniciar WhatsApp Bot
+    setTimeout(() => {
+      startWhatsAppBot();
+    }, 1000);
   } catch (error) {
     console.error('❌ Erro ao iniciar bot:', error);
     process.exit(1);
@@ -18,3 +25,4 @@ async function main() {
 }
 
 main();
+

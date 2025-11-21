@@ -22,10 +22,16 @@
     "@google/generative-ai": "^0.21.0",
     "@hapi/boom": "^10.0.1",
     "@prisma/client": "^6.2.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
     "@whiskeysockets/baileys": "^7.0.0-rc.8",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "openai": "^6.9.1",
     "pino": "^9.5.0",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

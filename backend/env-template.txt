@@ -1,3 +1,16 @@
+# Database
 DATABASE_URL="postgresql://postgres:password@localhost:5432/financaia?schema=public"
+
+# AI Provider (gemini ou openai)
+AI_PROVIDER="gemini"
+
+# Google Gemini API
 GEMINI_API_KEY="your-gemini-api-key-here"
+
+# OpenAI API (opcional - apenas se AI_PROVIDER=openai)
+OPENAI_API_KEY="your-openai-api-key-here"
+OPENAI_MODEL="gpt-4o-mini"
+
+# WhatsApp
+# Optional: Phone number to restrict bot (format: 5511999999999)
 ALLOWED_PHONE=""
