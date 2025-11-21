@@ -83,6 +83,16 @@ export async function processUserMessage(
       report += `🏆 Conquistas: ${stats.achievements}\n`;
     }
 
+    // Verificar se faz parte de família
+    const { getFamilyReport } = await import('./services/family.js');
+    const familyReport = await getFamilyReport(userId);
+    
+    if (!familyReport.error && familyReport.total !== undefined) {
+      report += `\n👨‍👩‍👧‍👦 *Família: ${familyReport.familyName}*\n`;
+      report += `💸 Total Familiar: R$ ${familyReport.total.toFixed(2)}\n`;
+      report += `ℹ️ Digite */familia* para detalhes`;
+    }
+
     await reply(report);
     return;
   }
@@ -98,11 +108,69 @@ export async function processUserMessage(
 💬 *Comandos:*
 • *saldo* - Ver saldo atual
 • *resumo* - Relatório do mês
+• *familia* - Gerenciar conta familiar
 • *ajuda* - Ver esta mensagem
 
 🎮 Ganhe XP e conquistas registrando suas finanças!`;
 
     await reply(help);
+    return;
+  }
+
+  // Normalizar texto para remover acentos
+  const normalizedText = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Comandos de Família
+  if (normalizedText.startsWith('/familia') || normalizedText.startsWith('familia')) {
+    const parts = normalizedText.split(' ');
+    const action = parts[1];
+    const { createFamilyGroup, joinFamilyGroup, getFamilyReport } = await import('./services/family.js');
+
+    if (action === 'criar') {
+      const result = await createFamilyGroup(userId);
+      if (result.error) {
+        await reply(`❌ ${result.error}`);
+      } else {
+        await reply(`🎉 *Família criada com sucesso!*\n\nCódigo de convite: *${result.familyGroup!.inviteCode}*\n\nCompartilhe este código com quem você quer adicionar à família.`);
+      }
+      return;
+    }
+
+    if (action === 'entrar') {
+      // Pegar o código original (sem lowerCase) mas limpar brackets se houver
+      let code = text.split(' ')[2] || '';
+      code = code.replace(/[\[\]]/g, '').trim();
+      
+      if (!code) {
+        await reply('⚠️ Use: `/familia entrar [codigo]`');
+        return;
+      }
+      const result = await joinFamilyGroup(userId, code);
+      if (result.error) {
+        await reply(`❌ ${result.error}`);
+      } else {
+        await reply(`🎉 *Você entrou na família ${result.familyGroup!.name}!*`);
+      }
+      return;
+    }
+
+    // Relatório da família (default)
+    const report = await getFamilyReport(userId);
+    if (report.error) {
+      await reply(`👨‍👩‍👧‍👦 *Conta Familiar*\n\nVocê ainda não faz parte de uma família.\n\n*Comandos:*\n• \`/familia criar\` - Criar nova família\n• \`/familia entrar [codigo]\` - Entrar em uma família existente`);
+    } else {
+      let msg = `👨‍👩‍👧‍👦 *Família: ${report.familyName}*\n`;
+      msg += `🔑 Código: *${report.inviteCode}*\n`;
+      msg += `👥 Membros: ${report.memberCount}\n\n`;
+      msg += `💸 *Total Gasto (Mês):* R$ ${report.total!.toFixed(2)}\n\n`;
+      
+      msg += `*Por Membro:*\n`;
+      Object.entries(report.byMember!).forEach(([name, amount]) => {
+        msg += `• ${name}: R$ ${amount.toFixed(2)}\n`;
+      });
+
+      await reply(msg);
+    }
     return;
   }
 

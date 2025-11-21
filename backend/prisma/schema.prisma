@@ -20,9 +20,23 @@ model User {
   streak        Int            @default(0) // dias consecutivos de registro
   lastActivity  DateTime?
   
+  // Family
+  familyGroupId String?
+  familyGroup   FamilyGroup?   @relation(fields: [familyGroupId], references: [id])
+
   transactions  Transaction[]
   budgets       Budget[]
   achievements  UserAchievement[]
+}
+
+model FamilyGroup {
+  id        String   @id @default(cuid())
+  name      String   @default("Família")
+  inviteCode String  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  members   User[]
 }
 
 model Transaction {
