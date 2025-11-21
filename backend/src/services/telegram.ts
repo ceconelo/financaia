@@ -76,6 +76,67 @@ export class TelegramService {
       }
     });
 
+    // Tratamento de imagens (photo)
+    this.bot.on(message('photo'), async (ctx) => {
+      try {
+        const userId = ctx.from.id.toString();
+        const userIdentifier = `tg_${userId}`;
+        
+        await ctx.reply('🖼️ Analisando nota fiscal...');
+
+        // Pegar a maior imagem (última do array)
+        const photos = ctx.message.photo;
+        const fileId = photos[photos.length - 1].file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        
+        // Download do arquivo
+        const response = await fetch(fileLink.href);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Analisar recibo
+        const { analyzeReceipt } = await import('../services/ai.js');
+        const transactionData = await analyzeReceipt(buffer);
+
+        if (!transactionData) {
+          await ctx.reply('❌ Não consegui ler a nota. Tente uma foto mais clara.');
+          return;
+        }
+
+        // Adicionar transação
+        const { addTransaction } = await import('./finance.js');
+        const { checkAchievements } = await import('./gamification.js');
+        
+        const user = await getOrCreateUser(userIdentifier);
+        await updateStreak(user.id);
+
+        const { transaction, xpGained } = await addTransaction(
+          user.id,
+          transactionData.amount,
+          transactionData.type,
+          transactionData.category,
+          transactionData.description
+        );
+
+        let replyMsg = `📸 *Nota fiscal processada!*\n\n`;
+        replyMsg += `Valor: R$ ${transactionData.amount.toFixed(2)}\n`;
+        replyMsg += `Local: ${transactionData.description}\n`;
+        replyMsg += `Categoria: ${transactionData.category}\n`;
+        replyMsg += `\n🎮 +${xpGained} XP`;
+
+        const achievements = await checkAchievements(user.id);
+        if (achievements.length > 0) {
+          replyMsg += '\n\n' + achievements.join('\n');
+        }
+
+        await ctx.replyWithMarkdown(replyMsg);
+
+      } catch (error) {
+        console.error('Erro ao processar imagem do Telegram:', error);
+        await ctx.reply('❌ Erro ao processar imagem.');
+      }
+    });
+
     // Tratamento de erros
     this.bot.catch((err, ctx) => {
       console.error(`Erro no bot do Telegram para ${ctx.updateType}:`, err);
