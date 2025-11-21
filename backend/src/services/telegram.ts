@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { processUserMessage } from '../messageHandler.js';
 import { getOrCreateUser } from './finance.js';
@@ -12,13 +12,38 @@ export class TelegramService {
     this.setupListeners();
   }
 
+  private getMainMenu() {
+    return Markup.keyboard([
+      ['💰 Saldo', '📊 Resumo'],
+      ['👨‍👩‍👧‍👦 Minha Família', '➕ Criar Família'],
+      ['❓ Ajuda']
+    ]).resize();
+  }
+
   private setupListeners() {
+    // Comandos de Menu
+    this.bot.command(['start', 'menu'], async (ctx) => {
+      await ctx.reply('👋 Olá! Use o menu abaixo para navegar:', this.getMainMenu());
+    });
+
     // Tratamento de mensagens de texto
     this.bot.on(message('text'), async (ctx) => {
       try {
         const userId = ctx.from.id.toString();
-        const text = ctx.message.text;
-        // const userName = ctx.from.first_name;
+        let text = ctx.message.text;
+        
+        // Mapeamento de botões para comandos
+        const buttonMap: Record<string, string> = {
+          '💰 Saldo': '/saldo',
+          '📊 Resumo': '/resumo',
+          '👨‍👩‍👧‍👦 Minha Família': '/familia',
+          '➕ Criar Família': '/familia criar',
+          '❓ Ajuda': '/ajuda'
+        };
+
+        if (buttonMap[text]) {
+          text = buttonMap[text];
+        }
 
         const userIdentifier = `tg_${userId}`;
         
@@ -27,12 +52,12 @@ export class TelegramService {
         await updateStreak(user.id);
 
         await processUserMessage(user.id, text, async (response) => {
-          await ctx.replyWithMarkdown(response);
+          await ctx.replyWithMarkdown(response, this.getMainMenu());
         });
 
       } catch (error) {
         console.error('Erro ao processar mensagem do Telegram:', error);
-        await ctx.reply('❌ Ocorreu um erro ao processar sua mensagem.');
+        await ctx.reply('❌ Ocorreu um erro ao processar sua mensagem.', this.getMainMenu());
       }
     });
 
