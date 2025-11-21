@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { startWhatsAppBot } from './services/whatsapp.js';
+import { startTelegramBot } from './services/telegram.js';
 import { startAPIServer } from './server.js';
 
 async function main() {
@@ -14,6 +15,9 @@ async function main() {
     // Iniciar API Server primeiro
     startAPIServer();
     
+    // Iniciar Telegram Bot
+    startTelegramBot();
+
     // Depois iniciar WhatsApp Bot
     setTimeout(() => {
       startWhatsAppBot();

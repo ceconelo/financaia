@@ -46,15 +46,17 @@ export async function handleMessage(sock: WASocket, message: WAMessage) {
   }
 }
 
-async function handleTextMessage(sock: WASocket, from: string, userId: string, text: string) {
+export async function processUserMessage(
+  userId: string,
+  text: string,
+  reply: (text: string) => Promise<void>
+) {
   const lowerText = text.toLowerCase().trim();
 
   // Comandos especiais
   if (lowerText === 'saldo' || lowerText === '/saldo') {
     const balance = await getBalance(userId);
-    await sock.sendMessage(from, {
-      text: `💰 *Seu saldo atual:* R$ ${balance.toFixed(2)}`,
-    });
+    await reply(`💰 *Seu saldo atual:* R$ ${balance.toFixed(2)}`);
     return;
   }
 
@@ -71,7 +73,7 @@ async function handleTextMessage(sock: WASocket, from: string, userId: string, t
     report += `*Por categoria:*\n`;
     
     Object.entries(expenses.byCategory).forEach(([cat, amount]) => {
-      report += `• ${cat}: R$ ${amount.toFixed(2)}\n`;
+      report += `• ${cat}: R$ ${(amount as number).toFixed(2)}\n`;
     });
 
     if (stats) {
@@ -81,7 +83,7 @@ async function handleTextMessage(sock: WASocket, from: string, userId: string, t
       report += `🏆 Conquistas: ${stats.achievements}\n`;
     }
 
-    await sock.sendMessage(from, { text: report });
+    await reply(report);
     return;
   }
 
@@ -100,7 +102,7 @@ async function handleTextMessage(sock: WASocket, from: string, userId: string, t
 
 🎮 Ganhe XP e conquistas registrando suas finanças!`;
 
-    await sock.sendMessage(from, { text: help });
+    await reply(help);
     return;
   }
 
@@ -108,9 +110,7 @@ async function handleTextMessage(sock: WASocket, from: string, userId: string, t
   const transactionData = await parseTransaction(text);
   
   if (!transactionData) {
-    await sock.sendMessage(from, {
-      text: '🤔 Não entendi. Tente algo como: "Gastei 50 reais em pizza" ou digite *ajuda*',
-    });
+    await reply('🤔 Não entendi. Tente algo como: "Gastei 50 reais em pizza" ou digite *ajuda*');
     return;
   }
 
@@ -141,7 +141,13 @@ async function handleTextMessage(sock: WASocket, from: string, userId: string, t
     response += '\n\n' + alert.message;
   }
 
-  await sock.sendMessage(from, { text: response });
+  await reply(response);
+}
+
+async function handleTextMessage(sock: WASocket, from: string, userId: string, text: string) {
+  await processUserMessage(userId, text, async (response) => {
+    await sock.sendMessage(from, { text: response });
+  });
 }
 
 async function handleAudioMessage(sock: WASocket, from: string, userId: string, message: WAMessage) {
