@@ -22,7 +22,10 @@ model User {
   
   // Family
   familyGroupId String?
-  familyGroup   FamilyGroup?   @relation(fields: [familyGroupId], references: [id])
+  familyGroup   FamilyGroup?   @relation("FamilyMembers", fields: [familyGroupId], references: [id])
+  
+  adminOfFamily FamilyGroup[]  @relation("FamilyAdmin")
+  budgetPlans   BudgetPlan[]
 
   transactions  Transaction[]
   budgets       Budget[]
@@ -36,7 +39,39 @@ model FamilyGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  members   User[]
+  adminId   String?  // Optional for migration compatibility, but logic should enforce it
+  admin     User?    @relation("FamilyAdmin", fields: [adminId], references: [id])
+  
+  members   User[]   @relation("FamilyMembers")
+  plans     BudgetPlan[]
+}
+
+model BudgetPlan {
+  id            String      @id @default(cuid())
+  familyGroupId String?
+  familyGroup   FamilyGroup? @relation(fields: [familyGroupId], references: [id])
+  
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  
+  category      String
+  type          PlanType
+  amount        Float       // Value in R$ or Percentage (0-100)
+  status        PlanStatus  @default(PENDING)
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum PlanType {
+  FIXED
+  PERCENTAGE
+}
+
+enum PlanStatus {
+  ACTIVE
+  PENDING
+  REJECTED
 }
 
 model Transaction {

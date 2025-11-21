@@ -15,8 +15,9 @@ export class TelegramService {
   private getMainMenu() {
     return Markup.keyboard([
       ['💰 Saldo', '📊 Resumo'],
-      ['👨‍👩‍👧‍👦 Minha Família', '➕ Criar Família'],
-      ['⚙️ Configurar Nome', '❓ Ajuda']
+      ['🎯 Planejamento', '👨‍👩‍👧‍👦 Minha Família'],
+      ['➕ Criar Família', '⚙️ Configurar Nome'],
+      ['❓ Ajuda']
     ]).resize();
   }
 
@@ -36,6 +37,7 @@ export class TelegramService {
         const buttonMap: Record<string, string> = {
           '💰 Saldo': '/saldo',
           '📊 Resumo': '/resumo',
+          '🎯 Planejamento': '/planejamento',
           '👨‍👩‍👧‍👦 Minha Família': '/familia',
           '➕ Criar Família': '/familia criar',
           '⚙️ Configurar Nome': '/nome', // Vai disparar o aviso de uso

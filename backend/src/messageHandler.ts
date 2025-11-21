@@ -52,6 +52,8 @@ export async function processUserMessage(
   reply: (text: string) => Promise<void>
 ) {
   const lowerText = text.toLowerCase().trim();
+  // Normalizar texto para remover acentos
+  const normalizedText = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   // Comandos especiais
   if (lowerText === 'saldo' || lowerText === '/saldo') {
@@ -97,29 +99,83 @@ export async function processUserMessage(
     return;
   }
 
-  if (lowerText === 'ajuda' || lowerText === '/ajuda' || lowerText === 'oi' || lowerText === 'olá') {
-    const help = `👋 *Olá! Sou seu assistente financeiro FinancaIA!*
+  if (normalizedText.startsWith('ajuda') || normalizedText.startsWith('/ajuda')) {
+    const parts = normalizedText.split(' ');
+    const topic = parts[1];
 
-📱 *Como usar:*
-• Envie mensagens como: "Gastei 50 reais em pizza"
-• Envie áudios descrevendo seus gastos
-• Envie fotos de notas fiscais
+    if (!topic) {
+      const menu = `❓ *Central de Ajuda FinancaIA*
 
-💬 *Comandos:*
-• *saldo* - Ver saldo atual
-• *resumo* - Relatório do mês
-• *familia* - Gerenciar conta familiar
-• *nome* - Alterar seu nome de exibição
-• *ajuda* - Ver esta mensagem
+Escolha um tópico para ver os comandos:
 
-🎮 Ganhe XP e conquistas registrando suas finanças!`;
+💰 */ajuda financas*
+_Saldo, Resumo, Transações_
 
-    await reply(help);
+👨‍👩‍👧‍👦 */ajuda familia*
+_Criar grupo, Entrar, Relatórios_
+
+🎯 */ajuda planejamento*
+_Criar metas, Editar, Acompanhar_
+
+⚙️ */ajuda outros*
+_Configurar nome, Gamificação_`;
+      await reply(menu);
+      return;
+    }
+
+    if (topic === 'financas') {
+      await reply(`💰 *Ajuda: Finanças*
+
+• *saldo*
+  _Ver seu saldo atual._
+• *resumo*
+  _Ver relatório de gastos do mês._
+• *"Gastei 50 em pizza"*
+  _Registrar gastos com linguagem natural._
+• *Enviar foto/áudio*
+  _Registrar gastos automaticamente._`);
+      return;
+    }
+
+    if (topic === 'familia') {
+      await reply(`👨‍👩‍👧‍👦 *Ajuda: Família*
+
+• *familia*
+  _Ver painel da família (gastos por membro/categoria)._
+• */familia criar*
+  _Criar um novo grupo familiar._
+• */familia entrar [código]*
+  _Entrar em um grupo existente._`);
+      return;
+    }
+
+    if (topic === 'planejamento') {
+      await reply(`🎯 *Ajuda: Planejamento*
+
+• */planejamento criar [Cat] [Valor]*
+  _Criar meta (Ex: /planejamento criar Lazer 500)_
+• */planejamento editar [Cat] [Valor]*
+  _Alterar valor da meta._
+• */planejamento renomear [Cat] [Novo]*
+  _Renomear categoria da meta._
+• */planejamento aprovar [ID]*
+  _Aprovar sugestão (apenas Admin)._`);
+      return;
+    }
+
+    if (topic === 'outros') {
+      await reply(`⚙️ *Ajuda: Outros*
+
+• */nome [Seu Nome]*
+  _Alterar como seu nome aparece na família._
+• *Gamificação*
+  _Você ganha XP a cada registro!_`);
+      return;
+    }
+    
+    await reply('❌ Tópico não encontrado. Digite */ajuda* para ver o menu.');
     return;
   }
-
-  // Normalizar texto para remover acentos
-  const normalizedText = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   // Comando de Nome
   if (normalizedText.startsWith('/nome') || normalizedText.startsWith('nome')) {
@@ -195,6 +251,128 @@ export async function processUserMessage(
 
       await reply(msg);
     }
+    return;
+  }
+
+  // Comandos de Planejamento
+  if (normalizedText.startsWith('/planejamento') || normalizedText.startsWith('planejamento')) {
+    const parts = text.split(' ');
+    const action = parts[1]?.toLowerCase();
+    const { createPlan, getPlans, approvePlan } = await import('./services/planning.js');
+
+    if (action === 'criar') {
+      // /planejamento criar [categoria] [valor]
+      const category = parts[2];
+      const valueStr = parts[3];
+
+      if (!category || !valueStr) {
+        await reply('⚠️ Use: `/planejamento criar [Categoria] [Valor]`\nEx: `/planejamento criar Alimentação 500` ou `/planejamento criar Lazer 10%`');
+        return;
+      }
+
+      let type: 'FIXED' | 'PERCENTAGE' = 'FIXED';
+      let amount = parseFloat(valueStr.replace(',', '.').replace('R$', '').replace('%', ''));
+
+      if (valueStr.includes('%')) {
+        type = 'PERCENTAGE';
+      }
+
+      if (isNaN(amount)) {
+        await reply('❌ Valor inválido.');
+        return;
+      }
+
+      try {
+        const result = await createPlan(userId, category, type, amount);
+        if (result.isPending) {
+          await reply(`📝 *Sugestão enviada!* O administrador da família precisa aprovar este plano.`);
+        } else {
+          await reply(`✅ *Plano criado!* Meta de ${type === 'PERCENTAGE' ? amount + '%' : 'R$ ' + amount} para ${category}.`);
+        }
+      } catch (e) {
+        await reply('❌ Erro ao criar plano.');
+      }
+      return;
+    }
+
+    if (action === 'aprovar') {
+      const planId = parts[2];
+      if (!planId) return;
+      const result = await approvePlan(userId, planId, true);
+      if (result.error) await reply(`❌ ${result.error}`);
+      else await reply('✅ Plano aprovado!');
+      return;
+    }
+
+    if (action === 'editar') {
+      // /planejamento editar [Categoria] [Novo Valor]
+      const category = parts[2];
+      const valueStr = parts[3];
+
+      if (!category || !valueStr) {
+        await reply('⚠️ Use: `/planejamento editar [Categoria] [Novo Valor]`');
+        return;
+      }
+
+      let type: 'FIXED' | 'PERCENTAGE' = 'FIXED';
+      let amount = parseFloat(valueStr.replace(',', '.').replace('R$', '').replace('%', ''));
+
+      if (valueStr.includes('%')) type = 'PERCENTAGE';
+      if (isNaN(amount)) {
+        await reply('❌ Valor inválido.');
+        return;
+      }
+
+      const { updatePlan } = await import('./services/planning.js');
+      const result = await updatePlan(userId, category, amount, undefined, type);
+
+      if (result.error) await reply(`❌ ${result.error}`);
+      else await reply(`✅ Plano de *${category}* atualizado para ${type === 'PERCENTAGE' ? amount + '%' : 'R$ ' + amount}!`);
+      return;
+    }
+
+    if (action === 'renomear') {
+      // /planejamento renomear [Categoria Atual] [Novo Nome]
+      const currentCategory = parts[2];
+      const newCategory = parts[3];
+
+      if (!currentCategory || !newCategory) {
+        await reply('⚠️ Use: `/planejamento renomear [Categoria Atual] [Novo Nome]`');
+        return;
+      }
+
+      const { updatePlan } = await import('./services/planning.js');
+      const result = await updatePlan(userId, currentCategory, undefined, newCategory);
+
+      if (result.error) await reply(`❌ ${result.error}`);
+      else await reply(`✅ Categoria renomeada de *${currentCategory}* para *${newCategory}*!`);
+      return;
+    }
+
+    // Listar planos
+    const { activePlans, pendingPlans } = await getPlans(userId);
+    let msg = `🎯 *Planejamento Financeiro*\n\n`;
+
+    if (activePlans.length === 0 && pendingPlans.length === 0) {
+      msg += 'Nenhum plano ativo.\nUse `/planejamento criar [Categoria] [Valor]` para começar.';
+    } else {
+      if (activePlans.length > 0) {
+        msg += `*Metas Ativas:*\n`;
+        activePlans.forEach((p: any) => {
+          msg += `• ${p.category}: ${p.type === 'PERCENTAGE' ? p.amount + '%' : 'R$ ' + p.amount.toFixed(2)}\n`;
+        });
+      }
+
+      if (pendingPlans.length > 0) {
+        msg += `\n⏳ *Pendentes de Aprovação:*\n`;
+        pendingPlans.forEach((p: any) => {
+          msg += `• ${p.category} (${p.user.name || 'Membro'}): ${p.type === 'PERCENTAGE' ? p.amount + '%' : 'R$ ' + p.amount.toFixed(2)}\n`;
+          msg += `  _Aprovar:_ \`/planejamento aprovar ${p.id}\`\n`;
+        });
+      }
+    }
+    
+    await reply(msg);
     return;
   }
 
