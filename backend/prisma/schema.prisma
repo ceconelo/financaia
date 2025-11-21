@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  phoneNumber   String         @unique
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  // Gamification
+  xp            Int            @default(0)
+  level         Int            @default(1)
+  streak        Int            @default(0) // dias consecutivos de registro
+  lastActivity  DateTime?
+  
+  transactions  Transaction[]
+  budgets       Budget[]
+  achievements  UserAchievement[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  amount      Float
+  type        TransactionType
+  category    String
+  description String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, date])
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Budget {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  category  String
+  limit     Float
+  month     Int      // 1-12
+  year      Int
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, category, month, year])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  icon        String
+  xpReward    Int
+  
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+  
+  @@unique([userId, achievementId])
+}

@@ -1,36 +1,136 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FinancaIA - Controle Financeiro via WhatsApp 💰
 
-## Getting Started
+Um assistente financeiro inteligente e gamificado que funciona 100% via WhatsApp.
 
-First, run the development server:
+## 🚀 Funcionalidades
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- ✅ Registro de gastos e receitas por texto, áudio ou imagem
+- 🤖 IA (Gemini) para entender linguagem natural e extrair dados de notas fiscais
+- 🎮 Sistema de gamificação (XP, níveis, conquistas, streaks)
+- 📊 Relatórios mensais e alertas de orçamento
+- 💬 Conversacional e fácil de usar
+
+## 📁 Estrutura do Projeto
+
+```
+financaia/
+├── backend/           # Bot WhatsApp + API
+│   ├── src/
+│   │   ├── index.ts              # Ponto de entrada
+│   │   ├── messageHandler.ts     # Lógica de processamento de mensagens
+│   │   └── services/
+│   │       ├── whatsapp.ts       # Integração Baileys
+│   │       ├── ai.ts             # Gemini (texto, áudio, imagem)
+│   │       ├── finance.ts        # Lógica financeira
+│   │       └── gamification.ts   # Sistema de XP e conquistas
+│   ├── prisma/
+│   │   └── schema.prisma         # Schema do banco de dados
+│   └── package.json
+└── src/               # Frontend Next.js (futuro dashboard web)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Pré-requisitos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 20+
+- PostgreSQL
+- Conta Google AI (para Gemini API)
 
-## Learn More
+### Instalação
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clone o repositório**
+```bash
+cd /mnt/nvme1n1/samples/financaia
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Configure o backend**
+```bash
+cd backend
+npm install
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Configure o banco de dados**
 
-## Deploy on Vercel
+Primeiro, inicie o PostgreSQL. Você pode usar Docker:
+```bash
+docker run --name financaia-db -e POSTGRES_PASSWORD=password -e POSTGRES_DB=financaia -p 5432:5432 -d postgres:16
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. **Configure as variáveis de ambiente**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copie o arquivo de template:
+```bash
+cp env-template.txt .env
+```
+
+Edite `.env` e adicione sua chave da API Gemini:
+```env
+DATABASE_URL="postgresql://postgres:password@localhost:5432/financaia?schema=public"
+GEMINI_API_KEY="sua-chave-aqui"
+```
+
+Para obter a chave do Gemini: https://aistudio.google.com/apikey
+
+5. **Execute as migrações do banco**
+```bash
+npx prisma migrate dev --name init
+npx prisma generate
+```
+
+6. **Inicie o bot**
+```bash
+npm run dev
+```
+
+7. **Conecte seu WhatsApp**
+
+Um QR Code será exibido no terminal. Escaneie com seu WhatsApp em:
+- WhatsApp > Configurações > Aparelhos conectados > Conectar aparelho
+
+## 💬 Como Usar
+
+Após conectar, envie mensagens para o bot:
+
+**Exemplos de mensagens:**
+- "Gastei 50 reais em pizza"
+- "Recebi 3000 de salário"
+- "Paguei 120 no supermercado"
+- Envie um áudio: "Gastei vinte e cinco reais no Uber"
+- Envie uma foto da nota fiscal
+
+**Comandos:**
+- `saldo` - Ver saldo atual
+- `resumo` - Relatório do mês
+- `ajuda` - Ver ajuda
+
+## 🎮 Gamificação
+
+- Ganhe **10 XP** por cada transação registrada
+- Suba de **nível** acumulando XP
+- Mantenha seu **streak** registrando gastos diariamente
+- Desbloqueie **conquistas**:
+  - 🎯 Primeiro Passo
+  - 🔥 Semana Completa
+  - 👑 Mestre do Controle
+  - 💰 Poupador
+
+## 🏗️ Stack Tecnológica
+
+- **Backend**: Node.js + TypeScript
+- **WhatsApp**: Baileys (WhatsApp Web API)
+- **IA**: Google Gemini 2.0 Flash
+- **Database**: PostgreSQL + Prisma ORM
+- **Frontend** (futuro): Next.js 15
+
+## 📝 Próximos Passos
+
+- [ ] Adicionar mais categorias personalizáveis
+- [ ] Relatórios gráficos via frontend web
+- [ ] Exportação de dados (CSV, PDF)
+- [ ] Metas financeiras de longo prazo
+- [ ] Sincronização com banco (Open Finance)
+
+## 📄 Licença
+
+MIT
