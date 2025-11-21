@@ -188,6 +188,11 @@ export async function processUserMessage(
         msg += `• ${safeName}: R$ ${amount.toFixed(2)}\n`;
       });
 
+      msg += `\n*Por Categoria:*\n`;
+      Object.entries(report.byCategory!).forEach(([category, amount]) => {
+        msg += `• ${category}: R$ ${amount.toFixed(2)}\n`;
+      });
+
       await reply(msg);
     }
     return;
