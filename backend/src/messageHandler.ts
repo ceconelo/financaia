@@ -109,6 +109,7 @@ export async function processUserMessage(
 • *saldo* - Ver saldo atual
 • *resumo* - Relatório do mês
 • *familia* - Gerenciar conta familiar
+• *nome* - Alterar seu nome de exibição
 • *ajuda* - Ver esta mensagem
 
 🎮 Ganhe XP e conquistas registrando suas finanças!`;
@@ -119,6 +120,22 @@ export async function processUserMessage(
 
   // Normalizar texto para remover acentos
   const normalizedText = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Comando de Nome
+  if (normalizedText.startsWith('/nome') || normalizedText.startsWith('nome')) {
+    const parts = text.split(' '); // Usar texto original para preservar case do nome
+    const newName = parts.slice(1).join(' ').trim();
+
+    if (!newName) {
+      await reply('⚠️ Use: `/nome [Seu Nome]` para alterar como você aparece na família.');
+      return;
+    }
+
+    const { updateUserName } = await import('./services/finance.js');
+    await updateUserName(userId, newName);
+    await reply(`✅ Nome atualizado para: *${newName}*`);
+    return;
+  }
 
   // Comandos de Família
   if (normalizedText.startsWith('/familia') || normalizedText.startsWith('familia')) {
@@ -166,7 +183,9 @@ export async function processUserMessage(
       
       msg += `*Por Membro:*\n`;
       Object.entries(report.byMember!).forEach(([name, amount]) => {
-        msg += `• ${name}: R$ ${amount.toFixed(2)}\n`;
+        // Escapar caracteres especiais do Markdown (principalmente underscore)
+        const safeName = name.replace(/_/g, '\\_').replace(/\*/g, '\\*').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+        msg += `• ${safeName}: R$ ${amount.toFixed(2)}\n`;
       });
 
       await reply(msg);

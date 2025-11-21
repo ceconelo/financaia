@@ -2,6 +2,13 @@ import { PrismaClient, TransactionType } from '@prisma/client';
 
 export const prisma = new PrismaClient();
 
+export async function updateUserName(userId: string, name: string) {
+  return await prisma.user.update({
+    where: { id: userId },
+    data: { name },
+  });
+}
+
 export async function getOrCreateUser(phoneNumber: string) {
   let user = await prisma.user.findUnique({
     where: { phoneNumber },

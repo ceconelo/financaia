@@ -16,7 +16,7 @@ export class TelegramService {
     return Markup.keyboard([
       ['💰 Saldo', '📊 Resumo'],
       ['👨‍👩‍👧‍👦 Minha Família', '➕ Criar Família'],
-      ['❓ Ajuda']
+      ['⚙️ Configurar Nome', '❓ Ajuda']
     ]).resize();
   }
 
@@ -38,6 +38,7 @@ export class TelegramService {
           '📊 Resumo': '/resumo',
           '👨‍👩‍👧‍👦 Minha Família': '/familia',
           '➕ Criar Família': '/familia criar',
+          '⚙️ Configurar Nome': '/nome', // Vai disparar o aviso de uso
           '❓ Ajuda': '/ajuda'
         };
 
