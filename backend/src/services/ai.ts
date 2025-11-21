@@ -129,10 +129,18 @@ Responda APENAS com JSON:
 
 // ============ OPENAI IMPLEMENTATION ============
 
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+// ... (existing imports)
+
+// ...
+
 async function parseTransactionOpenAI(text: string): Promise<TransactionData | null> {
   try {
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: process.env.OPENAI_MODEL || 'gpt-5.1-2025-11-13', // Updated default model
       messages: [
         {
           role: 'system',
@@ -180,9 +188,19 @@ Se não houver informação financeira, responda: { "error": "Não identifiquei"
 async function transcribeAudioOpenAI(audioBuffer: Buffer): Promise<string | null> {
   try {
     // OpenAI Whisper requer um arquivo
-    // Por enquanto, retornar null (necessitaria salvar buffer como arquivo temporário)
-    console.warn('Transcrição de áudio não implementada para OpenAI ainda');
-    return null;
+    const tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}.ogg`);
+    fs.writeFileSync(tempFilePath, audioBuffer);
+
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePath),
+      model: 'whisper-1',
+      language: 'pt',
+    });
+
+    // Limpar arquivo temporário
+    fs.unlinkSync(tempFilePath);
+
+    return transcription.text;
   } catch (error) {
     console.error('Erro ao transcrever áudio com OpenAI:', error);
     return null;

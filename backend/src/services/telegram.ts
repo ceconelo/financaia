@@ -36,6 +36,46 @@ export class TelegramService {
       }
     });
 
+    // Tratamento de áudio (voice)
+    this.bot.on(message('voice'), async (ctx) => {
+      try {
+        const userId = ctx.from.id.toString();
+        const userIdentifier = `tg_${userId}`;
+        
+        await ctx.reply('🎤 Processando áudio...');
+
+        // Obter link do arquivo
+        const fileId = ctx.message.voice.file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        
+        // Download do arquivo
+        const response = await fetch(fileLink.href);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Transcrever
+        const { transcribeAudio } = await import('../services/ai.js');
+        const transcription = await transcribeAudio(buffer);
+
+        if (!transcription) {
+          await ctx.reply('❌ Não consegui entender o áudio.');
+          return;
+        }
+
+        // Processar como texto
+        const user = await getOrCreateUser(userIdentifier);
+        await updateStreak(user.id);
+
+        await processUserMessage(user.id, transcription, async (response) => {
+          await ctx.replyWithMarkdown(response);
+        });
+
+      } catch (error) {
+        console.error('Erro ao processar áudio do Telegram:', error);
+        await ctx.reply('❌ Erro ao processar áudio.');
+      }
+    });
+
     // Tratamento de erros
     this.bot.catch((err, ctx) => {
       console.error(`Erro no bot do Telegram para ${ctx.updateType}:`, err);
