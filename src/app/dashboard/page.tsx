@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2 } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -29,6 +29,22 @@ interface ChartData {
   expense: number;
 }
 
+interface Transaction {
+  id: string;
+  amount: number;
+  type: 'INCOME' | 'EXPENSE';
+  category: string;
+  description: string | null;
+  createdAt: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export default function DashboardPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -41,6 +57,10 @@ export default function DashboardPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -74,12 +94,28 @@ export default function DashboardPage() {
       .catch(err => console.error('Erro ao buscar chart:', err));
   }, [selectedMonth, selectedYear, token]);
 
+  useEffect(() => {
+    if (token) {
+      fetchTransactions();
+    }
+  }, [selectedMonth, selectedYear, token]);
+
   const fetchStats = () => {
     setLoading(true);
     fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}&token=${token}`)
       .then(res => res.json())
       .then(data => setStats(data))
       .finally(() => setLoading(false));
+  };
+
+  const fetchTransactions = (page = 1) => {
+    fetch(`http://localhost:4000/api/transactions?token=${token}&month=${selectedMonth}&year=${selectedYear}&page=${page}&limit=10`)
+      .then(res => res.json())
+      .then(data => {
+        setTransactions(data.transactions);
+        setPagination(data.pagination);
+      })
+      .catch(err => console.error('Erro ao buscar transações:', err));
   };
 
   const handleResetMonth = async () => {
@@ -94,13 +130,64 @@ export default function DashboardPage() {
 
       if (res.ok) {
         alert('Dados do mês resetados com sucesso!');
-        fetchStats(); // Refresh data
+        fetchStats();
+        fetchTransactions();
       } else {
         alert('Erro ao resetar dados.');
       }
     } catch (error) {
       console.error('Erro ao resetar:', error);
       alert('Erro ao resetar dados.');
+    }
+  };
+
+  const handleEditTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+
+    try {
+      const res = await fetch(`http://localhost:4000/api/transactions/${editingTransaction.id}?token=${token}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: editingTransaction.amount,
+          category: editingTransaction.category,
+          description: editingTransaction.description,
+          type: editingTransaction.type
+        })
+      });
+
+      if (res.ok) {
+        setShowEditModal(false);
+        setEditingTransaction(null);
+        fetchStats();
+        fetchTransactions(pagination.page);
+      } else {
+        alert('Erro ao atualizar transação.');
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar:', error);
+      alert('Erro ao atualizar transação.');
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
+
+    try {
+      const res = await fetch(`http://localhost:4000/api/transactions/${id}?token=${token}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        fetchStats();
+        fetchTransactions(pagination.page);
+      } else {
+        alert('Erro ao excluir transação.');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      alert('Erro ao excluir transação.');
     }
   };
 
@@ -383,6 +470,173 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Transaction Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transações do Mês</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Data</th>
+                  <th className="text-left p-2">Descrição</th>
+                  <th className="text-left p-2">Categoria</th>
+                  <th className="text-left p-2">Tipo</th>
+                  <th className="text-right p-2">Valor</th>
+                  <th className="text-center p-2">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map(t => (
+                  <tr key={t.id} className="border-b hover:bg-gray-50">
+                    <td className="p-2">
+                      {new Date(t.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="p-2">{t.description || '-'}</td>
+                    <td className="p-2 capitalize">{t.category}</td>
+                    <td className="p-2">
+                      <span className={`px-2 py-1 rounded text-xs ${t.type === 'INCOME' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {t.type === 'INCOME' ? 'Receita' : 'Despesa'}
+                      </span>
+                    </td>
+                    <td className={`p-2 text-right font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {t.amount.toFixed(2)}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingTransaction(t);
+                            setShowEditModal(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleDeleteTransaction(t.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {transactions.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma transação encontrada neste mês
+              </p>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pagination.page === 1}
+                  onClick={() => fetchTransactions(pagination.page - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-3 py-2 text-sm">
+                  Página {pagination.page} de {pagination.totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pagination.page === pagination.totalPages}
+                  onClick={() => fetchTransactions(pagination.page + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Modal */}
+      {showEditModal && editingTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold mb-4">Editar Transação</h2>
+            <form onSubmit={handleEditTransaction}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Valor</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingTransaction.amount}
+                    onChange={e => setEditingTransaction({...editingTransaction, amount: parseFloat(e.target.value)})}
+                    className="w-full border rounded px-3 py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Categoria</label>
+                  <input
+                    type="text"
+                    value={editingTransaction.category}
+                    onChange={e => setEditingTransaction({...editingTransaction, category: e.target.value})}
+                    className="w-full border rounded px-3 py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Descrição</label>
+                  <input
+                    type="text"
+                    value={editingTransaction.description || ''}
+                    onChange={e => setEditingTransaction({...editingTransaction, description: e.target.value})}
+                    className="w-full border rounded px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tipo</label>
+                  <select
+                    value={editingTransaction.type}
+                    onChange={e => setEditingTransaction({...editingTransaction, type: e.target.value as 'INCOME' | 'EXPENSE'})}
+                    className="w-full border rounded px-3 py-2"
+                  >
+                    <option value="INCOME">Receita</option>
+                    <option value="EXPENSE">Despesa</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button type="submit" className="flex-1">Salvar</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingTransaction(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

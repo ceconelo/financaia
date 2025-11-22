@@ -398,6 +398,166 @@ app.delete('/api/transactions/reset', async (req, res) => {
   }
 });
 
+// GET /api/transactions - List transactions with pagination
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    if (!token || !month || !year) {
+      return res.status(400).json({ error: 'Token, month e year são obrigatórios' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { dashboardToken: token }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Calculate date range
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Get total count
+    const total = await prisma.transaction.count({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      }
+    });
+
+    // Get paginated transactions
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId: user.id,
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip: (page - 1) * limit,
+      take: limit
+    });
+
+    res.json({
+      transactions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar transações:', error);
+    res.status(500).json({ error: 'Erro ao buscar transações' });
+  }
+});
+
+// PUT /api/transactions/:id - Update transaction
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    const transactionId = req.params.id;
+    const { amount, category, description, type } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { dashboardToken: token }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check if transaction exists and belongs to user
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId }
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transação não encontrada' });
+    }
+
+    if (transaction.userId !== user.id) {
+      return res.status(403).json({ error: 'Não autorizado' });
+    }
+
+    // Update transaction
+    const updatedTransaction = await prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        amount: amount !== undefined ? amount : transaction.amount,
+        category: category || transaction.category,
+        description: description !== undefined ? description : transaction.description,
+        type: type || transaction.type
+      }
+    });
+
+    res.json(updatedTransaction);
+  } catch (error) {
+    console.error('Erro ao atualizar transação:', error);
+    res.status(500).json({ error: 'Erro ao atualizar transação' });
+  }
+});
+
+// DELETE /api/transactions/:id - Delete transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    const transactionId = req.params.id;
+
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { dashboardToken: token }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check if transaction exists and belongs to user
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId }
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transação não encontrada' });
+    }
+
+    if (transaction.userId !== user.id) {
+      return res.status(403).json({ error: 'Não autorizado' });
+    }
+
+    // Delete transaction
+    await prisma.transaction.delete({
+      where: { id: transactionId }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao deletar transação:', error);
+    res.status(500).json({ error: 'Erro ao deletar transação' });
+  }
+});
+
 // GET /api/admin/waitlist - Usuários na fila de espera
 app.get('/api/admin/waitlist', async (req, res) => {
   try {
