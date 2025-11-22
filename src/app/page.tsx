@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, MessageSquare, Zap } from 'lucide-react';
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpCircle, ArrowDownCircle, DollarSign, Activity, Users } from "lucide-react";
 
 export default function HomePage() {
   return (

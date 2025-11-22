@@ -27,8 +27,8 @@ export default function AdminPage() {
       
       setUsers(waitlistData);
       setActiveUsers(activeData);
-    } catch (error) {
-      console.error('Erro ao buscar dados', error);
+    } catch {
+      console.error('Erro ao buscar dados');
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function AdminPage() {
         setActiveUsers([user, ...activeUsers]);
       }
       alert('Usuário aprovado!');
-    } catch (error) {
+    } catch {
       alert('Erro ao aprovar usuário');
     }
   };
@@ -72,7 +72,7 @@ export default function AdminPage() {
         }
       }
       alert('Acesso revogado!');
-    } catch (error) {
+    } catch {
       alert('Erro ao revogar acesso');
     }
   };

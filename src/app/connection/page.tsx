@@ -83,13 +83,14 @@ export default function ConnectionPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Status da Conexão</CardTitle>
-                <CardDescription>
+                {/* CardDescription was removed as per user's snippet, but it's used here. Re-adding it to avoid breaking */}
+                <p className="text-sm text-muted-foreground">
                   {status.connected 
                     ? 'Bot conectado e operacional' 
                     : status.connecting 
                     ? 'Conectando...' 
                     : 'Bot desconectado'}
-                </CardDescription>
+                </p>
               </div>
               <div>
                 {status.connected ? (
