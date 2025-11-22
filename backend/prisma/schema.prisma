@@ -10,6 +10,7 @@ datasource db {
 model User {
   id            String         @id @default(cuid())
   phoneNumber   String         @unique
+  email         String?        @unique // Para waitlist
   name          String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -30,6 +31,22 @@ model User {
   transactions  Transaction[]
   budgets       Budget[]
   achievements  UserAchievement[]
+  
+  // Access Control
+  isAuthorized  Boolean        @default(false)
+  usedKey       AccessKey?
+}
+
+model AccessKey {
+  id            String    @id @default(cuid())
+  key           String    @unique
+  isUsed        Boolean   @default(false)
+  usedAt        DateTime?
+  
+  usedByUserId  String?   @unique
+  usedByUser    User?     @relation(fields: [usedByUserId], references: [id])
+  
+  createdAt     DateTime  @default(now())
 }
 
 model FamilyGroup {

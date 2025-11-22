@@ -55,6 +55,42 @@ export async function processUserMessage(
   // Normalizar texto para remover acentos
   const normalizedText = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+  // Verificar Autorização
+  const { checkAccess, validateKey } = await import('./services/auth.js');
+  const isAuthorized = await checkAccess(userId);
+
+  if (!isAuthorized) {
+    // Tentar validar se o texto é uma chave
+    if (text.length > 4 && text.length < 20 && !text.includes(' ') && !text.includes('@')) {
+      const result = await validateKey(userId, text.trim().toUpperCase());
+      if (result.success) {
+        await reply('🎉 *Acesso Liberado!* Bem-vindo ao FinancaIA.\n\nUse */ajuda* para começar.');
+        return;
+      }
+    }
+
+    // Tentar validar se é um email (para fila de espera)
+    if (text.includes('@') && text.includes('.')) {
+      const email = text.trim().toLowerCase();
+      const { prisma } = await import('./services/finance.js');
+      
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { email }
+        });
+        await reply('✅ *Você está na fila de espera!* \n\nAssim que liberarmos seu acesso, você receberá um aviso aqui.');
+      } catch (e) {
+        await reply('❌ Erro ao salvar email. Tente novamente.');
+      }
+      return;
+    }
+
+    // Menu de Bloqueio
+    await reply(`🔒 *Acesso Restrito*\n\nO FinancaIA é exclusivo para convidados.\n\n1️⃣ Se você tem uma chave, envie ela agora.\n2️⃣ Se não tem, envie seu *EMAIL* para entrar na fila de espera.`);
+    return;
+  }
+
   // Comandos especiais
   if (lowerText === 'saldo' || lowerText === '/saldo') {
     const balance = await getBalance(userId);

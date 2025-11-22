@@ -257,6 +257,93 @@ app.get('/api/transactions/chart', async (req, res) => {
   }
 });
 
+// GET /api/admin/waitlist - Usuários na fila de espera
+app.get('/api/admin/waitlist', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        isAuthorized: false,
+        email: { not: null }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar fila de espera' });
+  }
+});
+
+// POST /api/admin/approve - Aprovar usuário
+app.post('/api/admin/approve', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'UserId obrigatório' });
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isAuthorized: true }
+    });
+
+    // Opcional: Notificar usuário via bot (se tivermos acesso ao socket/bot instance aqui)
+    // Por enquanto, apenas libera no banco.
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao aprovar usuário' });
+  }
+});
+
+// GET /api/admin/active-users - Usuários ativos (autorizados)
+app.get('/api/admin/active-users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        isAuthorized: true
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        createdAt: true,
+        lastActivity: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar usuários ativos' });
+  }
+});
+
+// POST /api/admin/revoke - Revogar acesso
+app.post('/api/admin/revoke', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'UserId obrigatório' });
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isAuthorized: false }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao revogar acesso' });
+  }
+});
+
 // POST /api/chat - Chat de teste (sem WhatsApp)
 app.post('/api/chat', async (req, res) => {
   try {
