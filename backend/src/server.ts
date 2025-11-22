@@ -29,7 +29,7 @@ export const botState = {
 // Socket.io - para comunicação real-time com frontend
 io.on('connection', (socket) => {
   console.log('🔌 Cliente conectado ao WebSocket');
-  
+
   // Enviar estado atual quando cliente conecta
   socket.emit('connection-status', {
     connected: botState.connected,
@@ -56,49 +56,72 @@ export { io };
 app.get('/api/stats', async (req, res) => {
   try {
     const totalUsers = await prisma.user.count();
-    
+
+    // Parse query params
+    const now = new Date();
+    const monthParam = req.query.month ? parseInt(req.query.month as string) : now.getMonth() + 1;
+    const yearParam = req.query.year ? parseInt(req.query.year as string) : now.getFullYear();
+
+    // Calculate start and end dates for the selected month
+    const startDate = new Date(yearParam, monthParam - 1, 1);
+    const endDate = new Date(yearParam, monthParam, 0, 23, 59, 59, 999);
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
+    // Transactions Today (always today)
     const transactionsToday = await prisma.transaction.count({
       where: {
         createdAt: { gte: today }
       }
     });
 
+    // Transactions Week (always last 7 days)
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    
+
     const transactionsWeek = await prisma.transaction.count({
       where: {
         createdAt: { gte: weekAgo }
       }
     });
 
-    const monthAgo = new Date();
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
-    
+    // Transactions for the selected Month
     const transactionsMonth = await prisma.transaction.count({
       where: {
-        createdAt: { gte: monthAgo }
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
       }
     });
 
-    // Top categorias do mês
-    const transactions = await prisma.transaction.findMany({
+    // Financials for the selected Month
+    const periodTransactions = await prisma.transaction.findMany({
       where: {
-        createdAt: { gte: monthAgo },
-        type: 'EXPENSE'
+        createdAt: {
+          gte: startDate,
+          lte: endDate
+        }
       },
       select: {
-        category: true,
-        amount: true
+        type: true,
+        amount: true,
+        category: true
       }
     });
 
+    let totalIncome = 0;
+    let totalExpense = 0;
     const categoryTotals: Record<string, number> = {};
-    transactions.forEach(t => {
-      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+
+    periodTransactions.forEach(t => {
+      if (t.type === 'INCOME') {
+        totalIncome += t.amount;
+      } else {
+        totalExpense += t.amount;
+        categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+      }
     });
 
     const topCategories = Object.entries(categoryTotals)
@@ -106,7 +129,7 @@ app.get('/api/stats', async (req, res) => {
       .slice(0, 5)
       .map(([category, total]) => ({ category, total }));
 
-    // Usuários ativos (com transação nos últimos 7 dias)
+    // Usuários ativos (com transação nos últimos 7 dias - mantendo métrica de atividade recente)
     const activeUsers = await prisma.user.count({
       where: {
         transactions: {
@@ -127,7 +150,16 @@ app.get('/api/stats', async (req, res) => {
         week: transactionsWeek,
         month: transactionsMonth
       },
-      topCategories
+      financials: {
+        income: totalIncome,
+        expense: totalExpense,
+        balance: totalIncome - totalExpense
+      },
+      topCategories,
+      period: {
+        month: monthParam,
+        year: yearParam
+      }
     });
   } catch (error) {
     console.error('Erro ao buscar stats:', error);
@@ -140,8 +172,8 @@ app.get('/api/connection/status', (req, res) => {
   res.json({
     connected: botState.connected,
     phoneNumber: botState.phoneNumber,
-    uptime: botState.connectedAt 
-      ? Math.floor((Date.now() - botState.connectedAt.getTime()) / 1000) 
+    uptime: botState.connectedAt
+      ? Math.floor((Date.now() - botState.connectedAt.getTime()) / 1000)
       : 0,
     isReconnecting: botState.isReconnecting
   });
@@ -184,7 +216,7 @@ app.get('/api/users', async (req, res) => {
 app.get('/api/transactions/recent', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
-    
+
     const transactions = await prisma.transaction.findMany({
       take: limit,
       orderBy: {
@@ -229,7 +261,7 @@ app.get('/api/transactions/chart', async (req, res) => {
 
     // Agrupar por dia
     const dailyData: Record<string, { date: string; income: number; expense: number }> = {};
-    
+
     for (let i = 0; i < days; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -348,20 +380,20 @@ app.post('/api/admin/revoke', async (req, res) => {
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, phoneNumber } = req.body;
-    
+
     if (!message) {
       return res.status(400).json({ error: 'Mensagem é obrigatória' });
     }
 
     const testPhoneNumber = phoneNumber || '5511999999999'; // Número de teste
-    
+
     // Importar serviços
     const { parseTransaction } = await import('./services/ai.js');
-    const { 
-      getOrCreateUser, 
-      addTransaction, 
-      getBalance, 
-      getMonthlyExpenses 
+    const {
+      getOrCreateUser,
+      addTransaction,
+      getBalance,
+      getMonthlyExpenses
     } = await import('./services/finance.js');
     const { checkAchievements, updateStreak, getUserStats } = await import('./services/gamification.js');
 
@@ -391,7 +423,7 @@ app.post('/api/chat', async (req, res) => {
       report += `💸 Total gasto: R$ ${expenses.total.toFixed(2)}\n`;
       report += `📝 Transações: ${expenses.count}\n\n`;
       report += `*Por categoria:*\n`;
-      
+
       Object.entries(expenses.byCategory).forEach(([cat, amount]) => {
         report += `• ${cat}: R$ ${(amount as number).toFixed(2)}\n`;
       });
@@ -431,7 +463,7 @@ app.post('/api/chat', async (req, res) => {
 
     // Processar como transação com IA
     const transactionData = await parseTransaction(message);
-    
+
     if (!transactionData) {
       return res.json({
         type: 'error',
@@ -473,9 +505,9 @@ app.post('/api/chat', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no chat:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       type: 'error',
-      error: 'Erro ao processar mensagem' 
+      error: 'Erro ao processar mensagem'
     });
   }
 });

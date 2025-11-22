@@ -19,9 +19,9 @@ async function main() {
     startTelegramBot();
 
     // Depois iniciar WhatsApp Bot
-    setTimeout(() => {
-      startWhatsAppBot();
-    }, 1000);
+    // setTimeout(() => {
+    //   startWhatsAppBot();
+    // }, 1000);
   } catch (error) {
     console.error('❌ Erro ao iniciar bot:', error);
     process.exit(1);

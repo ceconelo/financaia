@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, DollarSign, Activity } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -10,7 +10,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 interface Stats {
   users: { total: number; active: number };
   transactions: { today: number; week: number; month: number };
+  financials: { income: number; expense: number; balance: number };
   topCategories: Array<{ category: string; total: number }>;
+  period: { month: number; year: number };
 }
 
 interface ChartData {
@@ -22,20 +24,43 @@ interface ChartData {
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   useEffect(() => {
-    // Buscar estatísticas
-    fetch('http://localhost:4000/api/stats')
+    // Buscar estatísticas com filtro de mês/ano
+    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}`)
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(err => console.error('Erro ao buscar stats:', err));
 
-    // Buscar dados do gráfico
+    // Buscar dados do gráfico (mantém últimos 7 dias por enquanto, ou poderia ser do mês)
+    // Para manter consistência com o dashboard original, mantemos o gráfico de 7 dias,
+    // mas idealmente poderia ser "evolução do mês". Vamos manter 7 dias por enquanto como solicitado no plano.
     fetch('http://localhost:4000/api/transactions/chart?days=7')
       .then(res => res.json())
       .then(data => setChartData(data))
       .catch(err => console.error('Erro ao buscar chart:', err));
-  }, []);
+  }, [selectedMonth, selectedYear]);
+
+  const months = [
+    { value: 1, label: 'Janeiro' },
+    { value: 2, label: 'Fevereiro' },
+    { value: 3, label: 'Março' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Maio' },
+    { value: 6, label: 'Junho' },
+    { value: 7, label: 'Julho' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Setembro' },
+    { value: 10, label: 'Outubro' },
+    { value: 11, label: 'Novembro' },
+    { value: 12, label: 'Dezembro' },
+  ];
+
+  const years = [2023, 2024, 2025];
 
   if (!stats) {
     return (
@@ -47,16 +72,86 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto p-8">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
             Visão geral do FinancaIA Bot
           </p>
         </div>
-        <Link href="/connection">
-          <Button>Ver Conexão WhatsApp</Button>
-        </Link>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-card p-2 rounded-lg border shadow-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <select 
+              className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer outline-none"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+            >
+              {months.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select 
+              className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer outline-none"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            >
+              {years.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          <Link href="/connection">
+            <Button>Ver Conexão WhatsApp</Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Financial Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Receitas (Mês)
+            </CardTitle>
+            <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-500">
+              R$ {stats.financials?.income.toFixed(2) || '0.00'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Despesas (Mês)
+            </CardTitle>
+            <ArrowDownCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">
+              R$ {stats.financials?.expense.toFixed(2) || '0.00'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Saldo (Mês)
+            </CardTitle>
+            <Wallet className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.financials?.balance >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+              R$ {stats.financials?.balance.toFixed(2) || '0.00'}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats Cards */}
@@ -101,7 +196,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.transactions.month}</div>
             <p className="text-xs text-muted-foreground">
-              No último mês
+              Neste mês selecionado
             </p>
           </CardContent>
         </Card>
@@ -194,7 +289,7 @@ export default function DashboardPage() {
             ))}
             {stats.topCategories.length === 0 && (
               <p className="text-center text-muted-foreground py-8">
-                Nenhuma transação registrada ainda
+                Nenhuma transação registrada neste mês
               </p>
             )}
           </div>
