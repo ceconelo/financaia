@@ -1,18 +1,18 @@
 import { WASocket, WAMessage, downloadMediaMessage, proto } from '@whiskeysockets/baileys';
 import { parseTransaction, transcribeAudio, analyzeReceipt } from './services/ai.js';
-import { 
-  getOrCreateUser, 
-  addTransaction, 
-  getBalance, 
+import {
+  getOrCreateUser,
+  addTransaction,
+  getBalance,
   getMonthlyExpenses,
-  checkBudgetAlert 
+  checkBudgetAlert
 } from './services/finance.js';
 import { checkAchievements, updateStreak, getUserStats } from './services/gamification.js';
 
 export async function handleMessage(sock: WASocket, message: WAMessage) {
   const from = message.key.remoteJid!;
   const msg = message.message;
-  
+
   if (!msg) return;
 
   // Extrair número de telefone
@@ -28,12 +28,12 @@ export async function handleMessage(sock: WASocket, message: WAMessage) {
       const text = msg.conversation || msg.extendedTextMessage?.text || '';
       await handleTextMessage(sock, from, user.id, text);
     }
-    
+
     // Áudio
     else if (msg.audioMessage) {
       await handleAudioMessage(sock, from, user.id, message);
     }
-    
+
     // Imagem
     else if (msg.imageMessage) {
       await handleImageMessage(sock, from, user.id, message);
@@ -73,7 +73,7 @@ export async function processUserMessage(
     if (text.includes('@') && text.includes('.')) {
       const email = text.trim().toLowerCase();
       const { prisma } = await import('./services/finance.js');
-      
+
       try {
         await prisma.user.update({
           where: { id: userId },
@@ -98,6 +98,15 @@ export async function processUserMessage(
     return;
   }
 
+  if (lowerText === 'dashboard' || lowerText === '/dashboard') {
+    const { getDashboardToken } = await import('./services/finance.js');
+    const token = await getDashboardToken(userId);
+    const link = `http://localhost:3000/dashboard?token=${token}`;
+
+    await reply(`📊 *Seu Dashboard Pessoal*\n\nAcesse seu painel exclusivo através deste link:\n\n${link}\n\n⚠️ *Atenção:* Não compartilhe este link com ninguém.`);
+    return;
+  }
+
   if (lowerText === 'resumo' || lowerText === '/resumo') {
     const now = new Date();
     const month = now.getMonth() + 1;
@@ -109,7 +118,7 @@ export async function processUserMessage(
     report += `💸 Total gasto: R$ ${expenses.total.toFixed(2)}\n`;
     report += `📝 Transações: ${expenses.count}\n\n`;
     report += `*Por categoria:*\n`;
-    
+
     Object.entries(expenses.byCategory).forEach(([cat, amount]) => {
       report += `• ${cat}: R$ ${(amount as number).toFixed(2)}\n`;
     });
@@ -124,7 +133,7 @@ export async function processUserMessage(
     // Verificar se faz parte de família
     const { getFamilyReport } = await import('./services/family.js');
     const familyReport = await getFamilyReport(userId);
-    
+
     if (!familyReport.error && familyReport.total !== undefined) {
       report += `\n👨‍👩‍👧‍👦 *Família: ${familyReport.familyName}*\n`;
       report += `💸 Total Familiar: R$ ${familyReport.total.toFixed(2)}\n`;
@@ -208,7 +217,7 @@ _Configurar nome, Gamificação_`;
   _Você ganha XP a cada registro!_`);
       return;
     }
-    
+
     await reply('❌ Tópico não encontrado. Digite */ajuda* para ver o menu.');
     return;
   }
@@ -249,7 +258,7 @@ _Configurar nome, Gamificação_`;
       // Pegar o código original (sem lowerCase) mas limpar brackets se houver
       let code = text.split(' ')[2] || '';
       code = code.replace(/[\[\]]/g, '').trim();
-      
+
       if (!code) {
         await reply('⚠️ Use: `/familia entrar [codigo]`');
         return;
@@ -273,7 +282,7 @@ _Configurar nome, Gamificação_`;
       msg += `👥 ${report.memberCount} Membros\n\n`;
       msg += `💸 *Total Mês: R$ ${report.total!.toFixed(2)}*\n`;
       msg += `──────────────────\n`;
-      
+
       msg += `👤 *Por Membro:*\n`;
       Object.entries(report.byMember!).forEach(([name, amount]) => {
         const safeName = name.replace(/_/g, '\\_').replace(/\*/g, '\\*').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
@@ -282,7 +291,7 @@ _Configurar nome, Gamificação_`;
       msg += `──────────────────\n`;
 
       msg += `📊 *Por Categoria:*\n\n`;
-      
+
       // Helper para barra de progresso
       const getProgressBar = (percentage: number) => {
         const totalBars = 10;
@@ -295,16 +304,16 @@ _Configurar nome, Gamificação_`;
 
       Object.entries(report.byCategory!).forEach(([category, amount]) => {
         const budget = report.budgets?.[category];
-        
+
         msg += `*${category}*\n`;
-        
+
         if (budget) {
           const percentage = Math.min(100, (amount / budget.limit) * 100); // % gasto
           const progressBar = getProgressBar(percentage);
-          
+
           msg += `R$ ${amount.toFixed(2)} de R$ ${budget.limit.toFixed(2)}\n`;
           msg += `${progressBar} ${percentage.toFixed(0)}%\n`;
-          
+
           if (amount > budget.limit) {
             msg += `🚨 *Estourou: R$ ${(amount - budget.limit).toFixed(2)}*\n`;
           } else {
@@ -439,14 +448,14 @@ _Configurar nome, Gamificação_`;
         });
       }
     }
-    
+
     await reply(msg);
     return;
   }
 
   // Processar como transação com IA
   const transactionData = await parseTransaction(text);
-  
+
   if (!transactionData) {
     await reply('🤔 Não entendi. Tente algo como: "Gastei 50 reais em pizza" ou digite *ajuda*');
     return;

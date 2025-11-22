@@ -35,6 +35,13 @@ model User {
   // Access Control
   isAuthorized  Boolean        @default(false)
   usedKey       AccessKey?
+  dashboardToken String?       @unique
+  role          UserRole       @default(USER)
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 model AccessKey {

@@ -81,7 +81,7 @@ export async function getMonthlyExpenses(userId: string, month: number, year: nu
   });
 
   const total = expenses.reduce((acc, e) => acc + e.amount, 0);
-  
+
   const byCategory = expenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + e.amount;
     return acc;
@@ -172,4 +172,25 @@ async function addXP(userId: string, amount: number) {
 function calculateLevel(xp: number): number {
   // 100 XP para level 2, depois aumenta 50 XP por level
   return Math.floor(1 + xp / 100);
+}
+
+export async function getDashboardToken(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { dashboardToken: true }
+  });
+
+  if (user?.dashboardToken) {
+    return user.dashboardToken;
+  }
+
+  const { randomUUID } = await import('crypto');
+  const token = randomUUID();
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dashboardToken: token }
+  });
+
+  return token;
 }

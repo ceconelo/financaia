@@ -6,6 +6,7 @@ import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, Arrow
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useSearchParams } from 'next/navigation';
 
 interface Stats {
   users: { total: number; active: number };
@@ -13,6 +14,7 @@ interface Stats {
   financials: { income: number; expense: number; balance: number };
   topCategories: Array<{ category: string; total: number }>;
   period: { month: number; year: number };
+  user?: { name: string; phoneNumber: string };
 }
 
 interface ChartData {
@@ -22,28 +24,47 @@ interface ChartData {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+  
   const [stats, setStats] = useState<Stats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [error, setError] = useState<string | null>(null);
   
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   useEffect(() => {
-    // Buscar estatísticas com filtro de mês/ano
-    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}`)
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .catch(err => console.error('Erro ao buscar stats:', err));
+    if (!token) {
+      setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
+      return;
+    }
 
-    // Buscar dados do gráfico (mantém últimos 7 dias por enquanto, ou poderia ser do mês)
-    // Para manter consistência com o dashboard original, mantemos o gráfico de 7 dias,
-    // mas idealmente poderia ser "evolução do mês". Vamos manter 7 dias por enquanto como solicitado no plano.
-    fetch('http://localhost:4000/api/transactions/chart?days=7')
-      .then(res => res.json())
+    // Buscar estatísticas com filtro de mês/ano e token
+    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}&token=${token}`)
+      .then(async res => {
+        if (!res.ok) {
+          if (res.status === 401) throw new Error('Token inválido ou expirado.');
+          throw new Error('Erro ao carregar dados.');
+        }
+        return res.json();
+      })
+      .then(data => setStats(data))
+      .catch(err => {
+        console.error('Erro ao buscar stats:', err);
+        setError(err.message);
+      });
+
+    // Buscar dados do gráfico
+    fetch(`http://localhost:4000/api/transactions/chart?days=7&token=${token}`)
+      .then(async res => {
+        if (!res.ok) throw new Error('Erro ao carregar gráfico.');
+        return res.json();
+      })
       .then(data => setChartData(data))
       .catch(err => console.error('Erro ao buscar chart:', err));
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, token]);
 
   const months = [
     { value: 1, label: 'Janeiro' },
@@ -62,6 +83,21 @@ export default function DashboardPage() {
 
   const years = [2023, 2024, 2025];
 
+  if (error) {
+    return (
+      <div className="container mx-auto p-8 flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-red-500">Acesso Negado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!stats) {
     return (
       <div className="container mx-auto p-8">
@@ -76,7 +112,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            Visão geral do FinancaIA Bot
+            {stats.user?.name ? `Olá, ${stats.user.name}` : 'Visão geral do FinancaIA Bot'}
           </p>
         </div>
         
@@ -102,10 +138,6 @@ export default function DashboardPage() {
               ))}
             </select>
           </div>
-
-          <Link href="/connection">
-            <Button>Ver Conexão WhatsApp</Button>
-          </Link>
         </div>
       </div>
 
@@ -166,7 +198,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.users.total}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.users.active} ativos esta semana
+              Global
             </p>
           </CardContent>
         </Card>
