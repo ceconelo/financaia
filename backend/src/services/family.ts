@@ -110,12 +110,36 @@ export async function getFamilyReport(userId: string) {
     byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
   });
 
+  // Buscar planos ativos da família
+  const plans = await prisma.budgetPlan.findMany({
+    where: {
+      familyGroupId: familyId,
+      status: 'ACTIVE',
+    },
+  });
+
+  const budgets: Record<string, { limit: number, spent: number, remaining: number, percentage: number }> = {};
+
+  plans.forEach(plan => {
+    // Normalizar categoria para comparar (case insensitive)
+    const categoryKey = Object.keys(byCategory).find(k => k.toLowerCase() === plan.category.toLowerCase()) || plan.category;
+    const spent = byCategory[categoryKey] || 0;
+    
+    if (plan.type === 'FIXED') {
+      const limit = plan.amount;
+      const remaining = Math.max(0, limit - spent);
+      const percentage = Math.min(100, (spent / limit) * 100);
+      budgets[categoryKey] = { limit, spent, remaining, percentage };
+    }
+  });
+
   return {
     familyName: user.familyGroup.name,
     inviteCode: user.familyGroup.inviteCode,
     total,
     byMember,
     byCategory,
+    budgets,
     memberCount: user.familyGroup.members.length,
   };
 }

@@ -233,20 +233,52 @@ _Configurar nome, Gamificação_`;
       await reply(`👨‍👩‍👧‍👦 *Conta Familiar*\n\nVocê ainda não faz parte de uma família.\n\n*Comandos:*\n• \`/familia criar\` - Criar nova família\n• \`/familia entrar [codigo]\` - Entrar em uma família existente`);
     } else {
       let msg = `👨‍👩‍👧‍👦 *Família: ${report.familyName}*\n`;
-      msg += `🔑 Código: *${report.inviteCode}*\n`;
-      msg += `👥 Membros: ${report.memberCount}\n\n`;
-      msg += `💸 *Total Gasto (Mês):* R$ ${report.total!.toFixed(2)}\n\n`;
+      msg += `🔑 Código: \`${report.inviteCode}\`\n`;
+      msg += `👥 ${report.memberCount} Membros\n\n`;
+      msg += `💸 *Total Mês: R$ ${report.total!.toFixed(2)}*\n`;
+      msg += `──────────────────\n`;
       
-      msg += `*Por Membro:*\n`;
+      msg += `👤 *Por Membro:*\n`;
       Object.entries(report.byMember!).forEach(([name, amount]) => {
-        // Escapar caracteres especiais do Markdown (principalmente underscore)
         const safeName = name.replace(/_/g, '\\_').replace(/\*/g, '\\*').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
         msg += `• ${safeName}: R$ ${amount.toFixed(2)}\n`;
       });
+      msg += `──────────────────\n`;
 
-      msg += `\n*Por Categoria:*\n`;
+      msg += `📊 *Por Categoria:*\n\n`;
+      
+      // Helper para barra de progresso
+      const getProgressBar = (percentage: number) => {
+        const totalBars = 10;
+        const filledBars = Math.min(totalBars, Math.round((percentage / 100) * totalBars));
+        const emptyBars = totalBars - filledBars;
+        const filled = '🟩'.repeat(filledBars);
+        const empty = '⬜'.repeat(emptyBars);
+        return `${filled}${empty}`;
+      };
+
       Object.entries(report.byCategory!).forEach(([category, amount]) => {
-        msg += `• ${category}: R$ ${amount.toFixed(2)}\n`;
+        const budget = report.budgets?.[category];
+        
+        msg += `*${category}*\n`;
+        
+        if (budget) {
+          const percentage = Math.min(100, (amount / budget.limit) * 100); // % gasto
+          const progressBar = getProgressBar(percentage);
+          
+          msg += `R$ ${amount.toFixed(2)} de R$ ${budget.limit.toFixed(2)}\n`;
+          msg += `${progressBar} ${percentage.toFixed(0)}%\n`;
+          
+          if (amount > budget.limit) {
+            msg += `🚨 *Estourou: R$ ${(amount - budget.limit).toFixed(2)}*\n`;
+          } else {
+            msg += `💰 Restam: R$ ${budget.remaining.toFixed(2)}\n`;
+          }
+        } else {
+          msg += `R$ ${amount.toFixed(2)}\n`;
+          msg += `_(Sem meta)_\n`;
+        }
+        msg += `\n`;
       });
 
       await reply(msg);
