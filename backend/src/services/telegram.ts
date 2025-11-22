@@ -15,9 +15,9 @@ export class TelegramService {
   private getMainMenu() {
     return Markup.keyboard([
       ['💰 Saldo', '📊 Resumo'],
-      ['🎯 Planejamento', '👨‍👩‍👧‍👦 Minha Família'],
-      ['➕ Criar Família', '⚙️ Configurar Nome'],
-      ['❓ Ajuda']
+      ['📊 Dashboard', '🎯 Planejamento'],
+      ['👨‍👩‍👧‍👦 Minha Família', '➕ Criar Família'],
+      ['⚙️ Configurar Nome', '❓ Ajuda']
     ]).resize();
   }
 
@@ -32,11 +32,12 @@ export class TelegramService {
       try {
         const userId = ctx.from.id.toString();
         let text = ctx.message.text;
-        
+
         // Mapeamento de botões para comandos
         const buttonMap: Record<string, string> = {
           '💰 Saldo': '/saldo',
           '📊 Resumo': '/resumo',
+          '📊 Dashboard': '/dashboard',
           '🎯 Planejamento': '/planejamento',
           '👨‍👩‍👧‍👦 Minha Família': '/familia',
           '➕ Criar Família': '/familia criar',
@@ -49,7 +50,7 @@ export class TelegramService {
         }
 
         const userIdentifier = `tg_${userId}`;
-        
+
         // Criar/buscar usuário
         const user = await getOrCreateUser(userIdentifier);
         await updateStreak(user.id);
@@ -69,13 +70,13 @@ export class TelegramService {
       try {
         const userId = ctx.from.id.toString();
         const userIdentifier = `tg_${userId}`;
-        
+
         await ctx.reply('🎤 Processando áudio...');
 
         // Obter link do arquivo
         const fileId = ctx.message.voice.file_id;
         const fileLink = await ctx.telegram.getFileLink(fileId);
-        
+
         // Download do arquivo
         const response = await fetch(fileLink.href);
         const arrayBuffer = await response.arrayBuffer();
@@ -109,14 +110,14 @@ export class TelegramService {
       try {
         const userId = ctx.from.id.toString();
         const userIdentifier = `tg_${userId}`;
-        
+
         await ctx.reply('🖼️ Analisando nota fiscal...');
 
         // Pegar a maior imagem (última do array)
         const photos = ctx.message.photo;
         const fileId = photos[photos.length - 1].file_id;
         const fileLink = await ctx.telegram.getFileLink(fileId);
-        
+
         // Download do arquivo
         const response = await fetch(fileLink.href);
         const arrayBuffer = await response.arrayBuffer();
@@ -134,7 +135,7 @@ export class TelegramService {
         // Adicionar transação
         const { addTransaction } = await import('./finance.js');
         const { checkAchievements } = await import('./gamification.js');
-        
+
         const user = await getOrCreateUser(userIdentifier);
         await updateStreak(user.id);
 
@@ -176,7 +177,7 @@ export class TelegramService {
     try {
       await this.bot.launch();
       console.log('✅ Telegram Bot iniciado com sucesso!');
-      
+
       // Enable graceful stop
       process.once('SIGINT', () => this.bot.stop('SIGINT'));
       process.once('SIGTERM', () => this.bot.stop('SIGTERM'));
