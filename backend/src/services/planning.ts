@@ -173,3 +173,42 @@ export async function updatePlan(
 
   return { success: true, plan: { ...plan, ...data } };
 }
+
+export async function deletePlan(userId: string, category: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { familyGroup: true },
+  });
+
+  if (!user) return { error: 'Usuário não encontrado' };
+
+  // Buscar plano
+  const plans = await prisma.budgetPlan.findMany({
+    where: {
+      OR: [
+        { userId: userId },
+        { familyGroupId: user.familyGroupId }
+      ],
+      category: { equals: category, mode: 'insensitive' },
+      status: { in: ['ACTIVE', 'PENDING'] }
+    }
+  });
+
+  if (plans.length === 0) return { error: 'Plano não encontrado.' };
+
+  const plan = plans.find(p => p.familyGroupId === user.familyGroupId) || plans[0];
+
+  const isAdmin = user.familyGroup?.adminId === userId;
+  const isOwner = plan.userId === userId;
+
+  if (!isOwner && !isAdmin) {
+    return { error: 'Você não tem permissão para excluir este plano.' };
+  }
+
+  await prisma.budgetPlan.update({
+    where: { id: plan.id },
+    data: { status: 'REJECTED' } // Soft delete (mark as rejected/inactive)
+  });
+
+  return { success: true };
+}
