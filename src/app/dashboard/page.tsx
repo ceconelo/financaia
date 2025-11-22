@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -14,7 +14,13 @@ interface Stats {
   financials: { income: number; expense: number; balance: number };
   topCategories: Array<{ category: string; total: number }>;
   period: { month: number; year: number };
-  user?: { name: string; phoneNumber: string };
+  user?: {
+    name: string | null;
+    phoneNumber: string;
+    role: string;
+    familyGroupId?: string | null;
+    isFamilyAdmin?: boolean;
+  };
 }
 
 interface ChartData {
@@ -30,6 +36,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
@@ -54,7 +61,8 @@ export default function DashboardPage() {
       .catch(err => {
         console.error('Erro ao buscar stats:', err);
         setError(err.message);
-      });
+      })
+      .finally(() => setLoading(false));
 
     // Buscar dados do gráfico
     fetch(`http://localhost:4000/api/transactions/chart?days=7&token=${token}`)
@@ -65,6 +73,36 @@ export default function DashboardPage() {
       .then(data => setChartData(data))
       .catch(err => console.error('Erro ao buscar chart:', err));
   }, [selectedMonth, selectedYear, token]);
+
+  const fetchStats = () => {
+    setLoading(true);
+    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}&token=${token}`)
+      .then(res => res.json())
+      .then(data => setStats(data))
+      .finally(() => setLoading(false));
+  };
+
+  const handleResetMonth = async () => {
+    if (!confirm('Tem certeza que deseja apagar TODOS os dados deste mês? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:4000/api/transactions/reset?token=${token}&month=${selectedMonth}&year=${selectedYear}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        alert('Dados do mês resetados com sucesso!');
+        fetchStats(); // Refresh data
+      } else {
+        alert('Erro ao resetar dados.');
+      }
+    } catch (error) {
+      console.error('Erro ao resetar:', error);
+      alert('Erro ao resetar dados.');
+    }
+  };
 
   const months = [
     { value: 1, label: 'Janeiro' },
@@ -83,6 +121,14 @@ export default function DashboardPage() {
 
   const years = [2023, 2024, 2025];
 
+  if (loading) {
+    return (
+      <div className="container mx-auto p-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">Carregando...</div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="container mx-auto p-8 flex items-center justify-center min-h-screen">
@@ -92,19 +138,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p>{error}</p>
+            {error === 'Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.' && (
+              <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 mt-4">
+                Para acessar seu dashboard, envie o comando <span className="font-mono font-bold">/dashboard</span> para o bot no Telegram.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="container mx-auto p-8">
-        <div className="text-center">Carregando...</div>
-      </div>
-    );
-  }
+  const canReset = !stats?.user?.familyGroupId || stats?.user?.isFamilyAdmin;
 
   return (
     <div className="container mx-auto p-8">
@@ -112,7 +157,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            {stats.user?.name ? `Olá, ${stats.user.name}` : 'Visão geral do FinancaIA Bot'}
+            {stats?.user?.name ? `Olá, ${stats?.user.name}` : 'Visão geral do FinancaIA Bot'}
           </p>
         </div>
         
@@ -138,6 +183,17 @@ export default function DashboardPage() {
               ))}
             </select>
           </div>
+          {canReset && (
+            <Button 
+              variant="destructive" 
+              size="sm"
+              onClick={handleResetMonth}
+              className="bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 border-red-200"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Resetar Mês
+            </Button>
+          )}
         </div>
       </div>
 
@@ -152,7 +208,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-500">
-              R$ {stats.financials?.income.toFixed(2) || '0.00'}
+              R$ {stats?.financials?.income.toFixed(2) || '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -166,7 +222,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              R$ {stats.financials?.expense.toFixed(2) || '0.00'}
+              R$ {stats?.financials?.expense.toFixed(2) || '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -179,8 +235,8 @@ export default function DashboardPage() {
             <Wallet className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${stats.financials?.balance >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
-              R$ {stats.financials?.balance.toFixed(2) || '0.00'}
+            <div className={`text-2xl font-bold ${stats?.financials?.balance >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+              R$ {stats?.financials?.balance.toFixed(2) || '0.00'}
             </div>
           </CardContent>
         </Card>
@@ -196,7 +252,7 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.users.total}</div>
+            <div className="text-2xl font-bold">{stats?.users.total}</div>
             <p className="text-xs text-muted-foreground">
               Global
             </p>
@@ -211,9 +267,9 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.transactions.today}</div>
+            <div className="text-2xl font-bold">{stats?.transactions.today}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.transactions.week} esta semana
+              {stats?.transactions.week} esta semana
             </p>
           </CardContent>
         </Card>
@@ -226,7 +282,7 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.transactions.month}</div>
+            <div className="text-2xl font-bold">{stats?.transactions.month}</div>
             <p className="text-xs text-muted-foreground">
               Neste mês selecionado
             </p>
@@ -241,13 +297,13 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {stats.topCategories[0] ? (
+            {stats?.topCategories[0] ? (
               <>
                 <div className="text-2xl font-bold capitalize">
-                  {stats.topCategories[0].category}
+                  {stats?.topCategories[0].category}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  R$ {stats.topCategories[0].total.toFixed(2)}
+                  R$ {stats?.topCategories[0].total.toFixed(2)}
                 </p>
               </>
             ) : (

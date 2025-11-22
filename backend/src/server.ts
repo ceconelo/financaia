@@ -178,7 +178,10 @@ app.get('/api/stats', async (req, res) => {
       user: {
         name: user.name,
         phoneNumber: user.phoneNumber,
-        role: user.role
+        role: user.role,
+        id: user.id,
+        familyGroupId: user.familyGroupId,
+        isFamilyAdmin: user.familyGroupId ? (await prisma.familyGroup.findUnique({ where: { id: user.familyGroupId } }))?.adminId === user.id : false
       }
     });
   } catch (error) {
@@ -321,6 +324,77 @@ app.get('/api/transactions/chart', async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar dados do gráfico:', error);
     res.status(500).json({ error: 'Erro ao buscar dados' });
+  }
+});
+
+// DELETE /api/transactions/reset - Resetar dados do mês
+app.delete('/api/transactions/reset', async (req, res) => {
+  try {
+    const token = req.query.token as string;
+    const month = parseInt(req.query.month as string);
+    const year = parseInt(req.query.year as string);
+
+    if (!token || !month || !year) {
+      return res.status(400).json({ error: 'Token, month e year são obrigatórios' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { dashboardToken: token },
+      include: { familyGroup: true }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Calculate start and end dates
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Permission check
+    // 1. Individual user (no family) -> Can delete own data
+    // 2. Family Admin -> Can delete ALL family data (or just own? User asked for "zerar os dados registrados do mês", implying context. 
+    //    If dashboard shows family data, reset should reset family data.
+    //    If dashboard shows user data, reset should reset user data.
+    //    The current dashboard seems to focus on USER data in the code I wrote earlier (userId filter).
+    //    However, the requirement mentions "usuário que criou o familiar", implying family context.
+    //    Let's assume:
+    //    - If user is in a family, we might need to delete for all family members IF the dashboard is showing family data.
+    //    - BUT, my previous edit to /api/stats filtered by `userId`.
+    //    - Let's stick to: Delete transactions where `userId` matches the requester, OR if they are admin, maybe they want to clear for everyone?
+    //    - "zerar os dados registrados do mês" -> "reset registered data for the month".
+    //    - If I am a family admin, I probably want to reset the family budget/expenses for the month.
+    //    - Let's check if the user is a family admin. If so, delete for all members of the family. If not, delete only for self.
+
+    let whereClause: any = {
+      createdAt: {
+        gte: startDate,
+        lte: endDate
+      }
+    };
+
+    if (user.familyGroupId && user.familyGroup?.adminId === user.id) {
+      // User is Family Admin: Delete for all family members
+      // Find all family members
+      const familyMembers = await prisma.user.findMany({
+        where: { familyGroupId: user.familyGroupId },
+        select: { id: true }
+      });
+      const memberIds = familyMembers.map(m => m.id);
+      whereClause.userId = { in: memberIds };
+    } else {
+      // Individual user or regular member: Delete only own data
+      whereClause.userId = user.id;
+    }
+
+    const result = await prisma.transaction.deleteMany({
+      where: whereClause
+    });
+
+    res.json({ success: true, count: result.count });
+  } catch (error) {
+    console.error('Erro ao resetar dados:', error);
+    res.status(500).json({ error: 'Erro ao resetar dados' });
   }
 });
 
