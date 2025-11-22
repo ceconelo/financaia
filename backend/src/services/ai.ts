@@ -29,9 +29,13 @@ Responda APENAS com um JSON no seguinte formato:
 {
   "amount": número (sem símbolo de moeda),
   "type": "INCOME" ou "EXPENSE",
-  "category": "alimentação" | "transporte" | "saúde" | "lazer" | "educação" | "moradia" | "outros" | "salário" | "freelance",
+  "category": "alimentação" | "mercado" | "transporte" | "saúde" | "lazer" | "educação" | "moradia" | "outros" | "salário" | "freelance",
   "description": "descrição breve"
 }
+
+REGRAS DE CATEGORIZAÇÃO:
+- "mercado": Gastos com mercado, feira, açougue e suprimentos para casa.
+- "alimentação": Gastos com comer fora, fastfood, lanches, restaurante, marmita, iFood, padaria (para lanche), etc.
 
 Se não houver informação financeira, responda com: { "error": "Não identifiquei um gasto ou receita" }
 
@@ -39,7 +43,7 @@ Mensagem do usuário: "${text}"`;
 
     const result = await geminiModel.generateContent(prompt);
     const response = result.response.text();
-    
+
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error('Resposta sem JSON:', response);
@@ -47,7 +51,7 @@ Mensagem do usuário: "${text}"`;
     }
 
     const data = JSON.parse(jsonMatch[0]);
-    
+
     if (data.error) {
       return null;
     }
@@ -74,10 +78,10 @@ async function transcribeAudioGemini(audioBuffer: Buffer): Promise<string | null
     };
 
     const prompt = 'Transcreva este áudio em português do Brasil:';
-    
+
     const result = await geminiModel.generateContent([prompt, audioPart]);
     const response = result.response.text();
-    
+
     return response.trim();
   } catch (error) {
     console.error('Erro ao transcrever áudio com Gemini:', error);
@@ -109,12 +113,12 @@ Responda APENAS com JSON:
 
     const result = await geminiModel.generateContent([prompt, imagePart]);
     const response = result.response.text();
-    
+
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const data = JSON.parse(jsonMatch[0]);
-    
+
     return {
       amount: parseFloat(data.amount),
       type: 'EXPENSE',
@@ -149,9 +153,13 @@ Responda APENAS com JSON no formato:
 {
   "amount": número,
   "type": "INCOME" ou "EXPENSE",
-  "category": "alimentação" | "transporte" | "saúde" | "lazer" | "educação" | "moradia" | "outros" | "salário" | "freelance",
+  "category": "alimentação" | "mercado" | "transporte" | "saúde" | "lazer" | "educação" | "moradia" | "outros" | "salário" | "freelance",
   "description": "descrição breve"
 }
+
+REGRAS DE CATEGORIZAÇÃO:
+- "mercado": Gastos com mercado, feira, açougue e suprimentos para casa.
+- "alimentação": Gastos com comer fora, fastfood, lanches, restaurante, marmita, iFood, padaria (para lanche), etc.
 
 Se não houver informação financeira, responda: { "error": "Não identifiquei" }`
         },
@@ -168,7 +176,7 @@ Se não houver informação financeira, responda: { "error": "Não identifiquei"
     if (!responseText) return null;
 
     const data = JSON.parse(responseText);
-    
+
     if (data.error) {
       return null;
     }
@@ -210,7 +218,7 @@ async function transcribeAudioOpenAI(audioBuffer: Buffer): Promise<string | null
 async function analyzeReceiptOpenAI(imageBuffer: Buffer): Promise<TransactionData | null> {
   try {
     const base64Image = imageBuffer.toString('base64');
-    
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -248,7 +256,7 @@ async function analyzeReceiptOpenAI(imageBuffer: Buffer): Promise<TransactionDat
     if (!responseText) return null;
 
     const data = JSON.parse(responseText);
-    
+
     return {
       amount: parseFloat(data.amount),
       type: 'EXPENSE',
@@ -265,7 +273,7 @@ async function analyzeReceiptOpenAI(imageBuffer: Buffer): Promise<TransactionDat
 
 export async function parseTransaction(text: string): Promise<TransactionData | null> {
   console.log(`🤖 Usando provider: ${AI_PROVIDER.toUpperCase()}`);
-  
+
   if (AI_PROVIDER === 'openai') {
     return parseTransactionOpenAI(text);
   } else {
