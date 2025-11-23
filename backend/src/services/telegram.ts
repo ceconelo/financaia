@@ -3,6 +3,8 @@ import { message } from 'telegraf/filters';
 import { processUserMessage } from '../messageHandler.js';
 import { getOrCreateUser } from './finance.js';
 import { updateStreak } from './gamification.js';
+import { sessionService } from './session.js';
+import { createPlan, deletePlan, getPlans, updatePlan } from './planning.js';
 
 export class TelegramService {
   private bot: Telegraf;
@@ -27,11 +29,185 @@ export class TelegramService {
       await ctx.reply('👋 Olá! Use o menu abaixo para navegar:', this.getMainMenu());
     });
 
+    // Callback Queries (Botões Inline)
+    this.bot.on('callback_query', async (ctx) => {
+      try {
+        const userId = ctx.from.id.toString();
+        const userIdentifier = `tg_${userId}`;
+        const user = await getOrCreateUser(userIdentifier);
+        // @ts-ignore
+        const data = ctx.callbackQuery.data;
+
+        // --- CREATE FLOW ---
+        if (data === 'plan_create') {
+          sessionService.setSession(user.id, 'PLAN_CREATE_CATEGORY');
+          await ctx.reply('📝 Digite a *Categoria* da nova meta (ex: Alimentação, Lazer):', { parse_mode: 'Markdown' });
+          await ctx.answerCbQuery();
+          return;
+        }
+
+        // --- DELETE FLOW ---
+        if (data === 'plan_delete') {
+          sessionService.setSession(user.id, 'PLAN_DELETE_CATEGORY');
+          await ctx.reply('🗑️ Digite a *Categoria* que deseja excluir:', { parse_mode: 'Markdown' });
+          await ctx.answerCbQuery();
+          return;
+        }
+
+        // --- EDIT FLOW ---
+        if (data === 'plan_edit') {
+          sessionService.setSession(user.id, 'PLAN_EDIT_CATEGORY');
+          await ctx.reply('✏️ Digite a *Categoria* que deseja alterar:', { parse_mode: 'Markdown' });
+          await ctx.answerCbQuery();
+          return;
+        }
+
+        if (data === 'edit_name') {
+          const session = sessionService.getSession(user.id);
+          if (session && session.data?.category) {
+            sessionService.setSession(user.id, 'PLAN_EDIT_NEW_NAME', { category: session.data.category });
+            await ctx.reply(`📝 Digite o novo *Nome* para ${session.data.category}:`, { parse_mode: 'Markdown' });
+          }
+          await ctx.answerCbQuery();
+          return;
+        }
+
+        if (data === 'edit_value') {
+          const session = sessionService.getSession(user.id);
+          if (session && session.data?.category) {
+            sessionService.setSession(user.id, 'PLAN_EDIT_NEW_VALUE', { category: session.data.category });
+            await ctx.reply(`💰 Digite o novo *Valor* ou *Porcentagem* para ${session.data.category}:`, { parse_mode: 'Markdown' });
+          }
+          await ctx.answerCbQuery();
+          return;
+        }
+
+      } catch (error) {
+        console.error('Erro no callback:', error);
+        await ctx.answerCbQuery('Erro ao processar.');
+      }
+    });
+
     // Tratamento de mensagens de texto
     this.bot.on(message('text'), async (ctx) => {
       try {
         const userId = ctx.from.id.toString();
+        const userIdentifier = `tg_${userId}`;
         let text = ctx.message.text;
+
+        // Criar/buscar usuário
+        const user = await getOrCreateUser(userIdentifier);
+        await updateStreak(user.id);
+
+        // Verificar Sessão Ativa (Wizard Flow)
+        const session = sessionService.getSession(user.id);
+
+        if (session) {
+          // --- CREATE STEPS ---
+          if (session.state === 'PLAN_CREATE_CATEGORY') {
+            sessionService.updateSessionData(user.id, { category: text });
+            sessionService.setSession(user.id, 'PLAN_CREATE_AMOUNT', { category: text });
+            await ctx.reply(`💰 Agora digite o *Valor* ou *Porcentagem* para ${text} (ex: 500 ou 10%):`, { parse_mode: 'Markdown' });
+            return;
+          }
+
+          if (session.state === 'PLAN_CREATE_AMOUNT') {
+            const category = session.data.category;
+            const valueStr = text;
+
+            let type: 'FIXED' | 'PERCENTAGE' = 'FIXED';
+            let amount = parseFloat(valueStr.replace(',', '.').replace('R$', '').replace('%', ''));
+
+            if (valueStr.includes('%')) type = 'PERCENTAGE';
+
+            if (isNaN(amount)) {
+              await ctx.reply('❌ Valor inválido. Tente novamente (ex: 500 ou 10%).');
+              return;
+            }
+
+            try {
+              const result = await createPlan(user.id, category, type, amount);
+              if (result.isPending) {
+                await ctx.reply(`📝 *Sugestão enviada!* O admin precisa aprovar.`);
+              } else {
+                await ctx.reply(`✅ *Plano criado!* Meta de ${type === 'PERCENTAGE' ? amount + '%' : 'R$ ' + amount} para ${category}.`);
+              }
+            } catch (e) {
+              await ctx.reply('❌ Erro ao criar plano.');
+            }
+
+            sessionService.clearSession(user.id);
+            return;
+          }
+
+          // --- DELETE STEPS ---
+          if (session.state === 'PLAN_DELETE_CATEGORY') {
+            const category = text;
+            const result = await deletePlan(user.id, category);
+
+            if (result.error) {
+              await ctx.reply(`❌ ${result.error}`);
+            } else {
+              await ctx.reply(`✅ Plano de *${category}* excluído!`);
+            }
+
+            sessionService.clearSession(user.id);
+            return;
+          }
+
+          // --- EDIT STEPS ---
+          if (session.state === 'PLAN_EDIT_CATEGORY') {
+            const category = text;
+            sessionService.setSession(user.id, 'PLAN_EDIT_OPTION', { category });
+
+            await ctx.reply(`O que deseja alterar em *${category}*?`,
+              Markup.inlineKeyboard([
+                [Markup.button.callback('📝 Nome', 'edit_name'), Markup.button.callback('💰 Valor', 'edit_value')]
+              ])
+            );
+            return;
+          }
+
+          if (session.state === 'PLAN_EDIT_NEW_NAME') {
+            const category = session.data.category;
+            const newName = text;
+
+            const result = await updatePlan(user.id, category, undefined, newName);
+
+            if (result.error) {
+              await ctx.reply(`❌ ${result.error}`);
+            } else {
+              await ctx.reply(`✅ Categoria renomeada de *${category}* para *${newName}*!`);
+            }
+            sessionService.clearSession(user.id);
+            return;
+          }
+
+          if (session.state === 'PLAN_EDIT_NEW_VALUE') {
+            const category = session.data.category;
+            const valueStr = text;
+
+            let type: 'FIXED' | 'PERCENTAGE' = 'FIXED';
+            let amount = parseFloat(valueStr.replace(',', '.').replace('R$', '').replace('%', ''));
+
+            if (valueStr.includes('%')) type = 'PERCENTAGE';
+
+            if (isNaN(amount)) {
+              await ctx.reply('❌ Valor inválido. Tente novamente.');
+              return;
+            }
+
+            const result = await updatePlan(user.id, category, amount, undefined, type);
+
+            if (result.error) {
+              await ctx.reply(`❌ ${result.error}`);
+            } else {
+              await ctx.reply(`✅ Plano de *${category}* atualizado para ${type === 'PERCENTAGE' ? amount + '%' : 'R$ ' + amount}!`);
+            }
+            sessionService.clearSession(user.id);
+            return;
+          }
+        }
 
         // Mapeamento de botões para comandos
         const buttonMap: Record<string, string> = {
@@ -41,7 +217,7 @@ export class TelegramService {
           '🎯 Planejamento': '/planejamento',
           '👨‍👩‍👧‍👦 Minha Família': '/familia',
           '➕ Criar Família': '/familia criar',
-          '⚙️ Configurar Nome': '/nome', // Vai disparar o aviso de uso
+          '⚙️ Configurar Nome': '/nome',
           '❓ Ajuda': '/ajuda'
         };
 
@@ -49,11 +225,34 @@ export class TelegramService {
           text = buttonMap[text];
         }
 
-        const userIdentifier = `tg_${userId}`;
+        // Intercept Planning Command to show Inline Menu
+        if (text === '/planejamento' || text.toLowerCase() === 'planejamento') {
+          const { activePlans, pendingPlans } = await getPlans(user.id);
+          let msg = `🎯 *Planejamento Financeiro*\n\n`;
 
-        // Criar/buscar usuário
-        const user = await getOrCreateUser(userIdentifier);
-        await updateStreak(user.id);
+          if (activePlans.length === 0 && pendingPlans.length === 0) {
+            msg += 'Nenhum plano ativo.\n';
+          } else {
+            if (activePlans.length > 0) {
+              msg += `*Metas Ativas:*\n`;
+              activePlans.forEach((p: any) => {
+                msg += `• ${p.category}: ${p.type === 'PERCENTAGE' ? p.amount + '%' : 'R$ ' + p.amount.toFixed(2)}\n`;
+              });
+            }
+            if (pendingPlans.length > 0) {
+              msg += `\n⏳ *Pendentes:*\n`;
+              pendingPlans.forEach((p: any) => {
+                msg += `• ${p.category}: ${p.amount}\n`;
+              });
+            }
+          }
+
+          await ctx.replyWithMarkdown(msg, Markup.inlineKeyboard([
+            [Markup.button.callback('➕ Nova Meta', 'plan_create')],
+            [Markup.button.callback('✏️ Editar', 'plan_edit'), Markup.button.callback('🗑️ Excluir', 'plan_delete')]
+          ]));
+          return;
+        }
 
         await processUserMessage(user.id, text, async (response) => {
           await ctx.replyWithMarkdown(response, this.getMainMenu());
