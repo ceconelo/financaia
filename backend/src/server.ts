@@ -50,14 +50,20 @@ io.on('connection', (socket) => {
 // Exportar io para uso nos services
 export { io };
 
-// ============ API ROUTES ============
+// ============ MIDDLEWARES ============
 
-// GET /api/stats - Estatísticas gerais
-app.get('/api/stats', async (req, res) => {
+// Middleware de autenticação (Header ou Query Param)
+const authenticate = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
-    const token = req.query.token as string;
+    let token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
+
+    // Fallback para query param (para compatibilidade/magic link)
+    if (!token && req.query.token) {
+      token = req.query.token as string;
+    }
+
     if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized: Token missing' });
     }
 
     const user = await prisma.user.findUnique({
@@ -65,14 +71,63 @@ app.get('/api/stats', async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
     }
 
+    // Anexar usuário ao request
+    (req as any).user = user;
+    next();
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(500).json({ error: 'Internal server error during auth' });
+  }
+};
+
+// Middleware de Admin
+const authenticateAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // TODO: Implementar lógica real de admin.
+  // Por enquanto, vamos verificar se existe um header 'x-admin-secret' ou se o usuário autenticado tem role 'ADMIN'
+  // Como não temos autenticação nas rotas de admin ainda, vamos usar um segredo simples via env ou hardcoded para teste.
+
+  const adminSecret = process.env.ADMIN_SECRET || 'admin123'; // Em produção, use uma variável de ambiente forte!
+  const requestSecret = req.headers['x-admin-secret'];
+
+  if (requestSecret === adminSecret) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Forbidden: Admin access only' });
+};
+
+// Middleware para validar requisições do Bot/Chat
+const validateBotRequest = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Em produção, o bot deve enviar um secret compartilhado
+  // Para teste local, permitimos localhost ou um secret específico
+
+  const botSecret = process.env.BOT_SECRET || 'bot_secret_123';
+  const requestSecret = req.headers['x-bot-secret'];
+
+  // Permitir se vier do localhost (para testes locais simples)
+  const remoteAddress = req.socket.remoteAddress;
+  const isLocalhost = remoteAddress === '::1' || remoteAddress === '127.0.0.1' || remoteAddress === '::ffff:127.0.0.1';
+
+  if (requestSecret === botSecret || isLocalhost) {
+    return next();
+  }
+
+  return res.status(403).json({ error: 'Forbidden: Bot access only' });
+};
+
+// ============ API ROUTES ============
+
+// GET /api/stats - Estatísticas gerais
+app.get('/api/stats', authenticate, async (req, res) => {
+  try {
+    const user = (req as any).user;
     const userId = user.id;
-    const totalUsers = await prisma.user.count(); // Mantém contagem global ou muda para contexto do usuário? 
-    // O dashboard original mostrava "Total Usuários", o que parece ser uma métrica global.
-    // Se a ideia é "Somente o dele e/ou familiar", talvez devêssemos esconder métricas globais ou focar no usuário.
-    // Vou manter métricas globais por enquanto mas focar as transações no usuário.
+
+    // ... (rest of stats logic using user object)
+    const totalUsers = await prisma.user.count();
 
     // Parse query params
     const now = new Date();
@@ -202,8 +257,8 @@ app.get('/api/connection/status', (req, res) => {
   });
 });
 
-// GET /api/users - Lista de usuários
-app.get('/api/users', async (req, res) => {
+// GET /api/users - Lista de usuários (PROTECTED ADMIN)
+app.get('/api/users', authenticateAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -235,12 +290,19 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// GET /api/transactions/recent - Transações recentes
-app.get('/api/transactions/recent', async (req, res) => {
+// GET /api/transactions/recent - Transações recentes (PROTECTED)
+app.get('/api/transactions/recent', authenticate, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 20;
+    // TODO: Filter by authenticated user? Currently returns all.
+    // Assuming this is for admin or global view? Or should be user specific?
+    // Based on previous code, it returned ALL transactions.
+    // Let's restrict to authenticated user for safety.
+
+    const user = (req as any).user;
 
     const transactions = await prisma.transaction.findMany({
+      where: { userId: user.id },
       take: limit,
       orderBy: {
         createdAt: 'desc'
@@ -262,22 +324,10 @@ app.get('/api/transactions/recent', async (req, res) => {
   }
 });
 
-// GET /api/transactions/chart - Dados para gráfico
-app.get('/api/transactions/chart', async (req, res) => {
+// GET /api/transactions/chart - Dados para gráfico (PROTECTED)
+app.get('/api/transactions/chart', authenticate, async (req, res) => {
   try {
-    const token = req.query.token as string;
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { dashboardToken: token }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
+    const user = (req as any).user;
     const userId = user.id;
     const days = parseInt(req.query.days as string) || 7;
     const startDate = new Date();
@@ -327,44 +377,20 @@ app.get('/api/transactions/chart', async (req, res) => {
   }
 });
 
-// DELETE /api/transactions/reset - Resetar dados do mês
-app.delete('/api/transactions/reset', async (req, res) => {
+// DELETE /api/transactions/reset - Resetar dados do mês (PROTECTED)
+app.delete('/api/transactions/reset', authenticate, async (req, res) => {
   try {
-    const token = req.query.token as string;
+    const user = (req as any).user;
     const month = parseInt(req.query.month as string);
     const year = parseInt(req.query.year as string);
 
-    if (!token || !month || !year) {
-      return res.status(400).json({ error: 'Token, month e year são obrigatórios' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { dashboardToken: token },
-      include: { familyGroup: true }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+    if (!month || !year) {
+      return res.status(400).json({ error: 'Month e year são obrigatórios' });
     }
 
     // Calculate start and end dates
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-
-    // Permission check
-    // 1. Individual user (no family) -> Can delete own data
-    // 2. Family Admin -> Can delete ALL family data (or just own? User asked for "zerar os dados registrados do mês", implying context. 
-    //    If dashboard shows family data, reset should reset family data.
-    //    If dashboard shows user data, reset should reset user data.
-    //    The current dashboard seems to focus on USER data in the code I wrote earlier (userId filter).
-    //    However, the requirement mentions "usuário que criou o familiar", implying family context.
-    //    Let's assume:
-    //    - If user is in a family, we might need to delete for all family members IF the dashboard is showing family data.
-    //    - BUT, my previous edit to /api/stats filtered by `userId`.
-    //    - Let's stick to: Delete transactions where `userId` matches the requester, OR if they are admin, maybe they want to clear for everyone?
-    //    - "zerar os dados registrados do mês" -> "reset registered data for the month".
-    //    - If I am a family admin, I probably want to reset the family budget/expenses for the month.
-    //    - Let's check if the user is a family admin. If so, delete for all members of the family. If not, delete only for self.
 
     let whereClause: any = {
       createdAt: {
@@ -373,17 +399,25 @@ app.delete('/api/transactions/reset', async (req, res) => {
       }
     };
 
-    if (user.familyGroupId && user.familyGroup?.adminId === user.id) {
-      // User is Family Admin: Delete for all family members
-      // Find all family members
+    // Check if user is family admin to delete family data
+    // Need to fetch family info as it might not be fully populated in 'user' object from auth middleware
+    // (Auth middleware uses findUnique, which by default doesn't include relations unless specified)
+    // But we can check familyGroupId on the user object.
+
+    // Re-fetch user with family info to be sure about admin status
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { familyGroup: true }
+    });
+
+    if (fullUser?.familyGroupId && fullUser.familyGroup?.adminId === fullUser.id) {
       const familyMembers = await prisma.user.findMany({
-        where: { familyGroupId: user.familyGroupId },
+        where: { familyGroupId: fullUser.familyGroupId },
         select: { id: true }
       });
       const memberIds = familyMembers.map(m => m.id);
       whereClause.userId = { in: memberIds };
     } else {
-      // Individual user or regular member: Delete only own data
       whereClause.userId = user.id;
     }
 
@@ -398,25 +432,17 @@ app.delete('/api/transactions/reset', async (req, res) => {
   }
 });
 
-// GET /api/transactions - List transactions with pagination
-app.get('/api/transactions', async (req, res) => {
+// GET /api/transactions - List transactions with pagination (PROTECTED)
+app.get('/api/transactions', authenticate, async (req, res) => {
   try {
-    const token = req.query.token as string;
+    const user = (req as any).user;
     const month = parseInt(req.query.month as string);
     const year = parseInt(req.query.year as string);
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    if (!token || !month || !year) {
-      return res.status(400).json({ error: 'Token, month e year são obrigatórios' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { dashboardToken: token }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+    if (!month || !year) {
+      return res.status(400).json({ error: 'Month e year são obrigatórios' });
     }
 
     // Calculate date range
@@ -465,24 +491,12 @@ app.get('/api/transactions', async (req, res) => {
   }
 });
 
-// PUT /api/transactions/:id - Update transaction
-app.put('/api/transactions/:id', async (req, res) => {
+// PUT /api/transactions/:id - Update transaction (PROTECTED)
+app.put('/api/transactions/:id', authenticate, async (req, res) => {
   try {
-    const token = req.query.token as string;
+    const user = (req as any).user;
     const transactionId = req.params.id;
     const { amount, category, description, type } = req.body;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { dashboardToken: token }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
 
     // Check if transaction exists and belongs to user
     const transaction = await prisma.transaction.findUnique({
@@ -515,23 +529,11 @@ app.put('/api/transactions/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/transactions/:id - Delete transaction
-app.delete('/api/transactions/:id', async (req, res) => {
+// DELETE /api/transactions/:id - Delete transaction (PROTECTED)
+app.delete('/api/transactions/:id', authenticate, async (req, res) => {
   try {
-    const token = req.query.token as string;
+    const user = (req as any).user;
     const transactionId = req.params.id;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { dashboardToken: token }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
 
     // Check if transaction exists and belongs to user
     const transaction = await prisma.transaction.findUnique({
@@ -558,8 +560,8 @@ app.delete('/api/transactions/:id', async (req, res) => {
   }
 });
 
-// GET /api/admin/waitlist - Usuários na fila de espera
-app.get('/api/admin/waitlist', async (req, res) => {
+// GET /api/admin/waitlist - Usuários na fila de espera (PROTECTED ADMIN)
+app.get('/api/admin/waitlist', authenticateAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       where: {
@@ -583,8 +585,8 @@ app.get('/api/admin/waitlist', async (req, res) => {
   }
 });
 
-// POST /api/admin/approve - Aprovar usuário
-app.post('/api/admin/approve', async (req, res) => {
+// POST /api/admin/approve - Aprovar usuário (PROTECTED ADMIN)
+app.post('/api/admin/approve', authenticateAdmin, async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'UserId obrigatório' });
@@ -603,8 +605,8 @@ app.post('/api/admin/approve', async (req, res) => {
   }
 });
 
-// GET /api/admin/active-users - Usuários ativos (autorizados)
-app.get('/api/admin/active-users', async (req, res) => {
+// GET /api/admin/active-users - Usuários ativos (PROTECTED ADMIN)
+app.get('/api/admin/active-users', authenticateAdmin, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       where: {
@@ -628,8 +630,8 @@ app.get('/api/admin/active-users', async (req, res) => {
   }
 });
 
-// POST /api/admin/revoke - Revogar acesso
-app.post('/api/admin/revoke', async (req, res) => {
+// POST /api/admin/revoke - Revogar acesso (PROTECTED ADMIN)
+app.post('/api/admin/revoke', authenticateAdmin, async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'UserId obrigatório' });
@@ -646,7 +648,7 @@ app.post('/api/admin/revoke', async (req, res) => {
 });
 
 // POST /api/chat - Chat de teste (sem WhatsApp)
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', validateBotRequest, async (req, res) => {
   try {
     const { message, phoneNumber } = req.body;
 

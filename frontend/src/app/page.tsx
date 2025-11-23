@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpCircle, ArrowDownCircle, DollarSign, Activity, Users } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { MessageSquare, Zap, BarChart3 } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -93,7 +93,7 @@ export default function HomePage() {
             <div>
               <h3 className="text-xl font-semibold mb-2">Envie seus gastos</h3>
               <p className="text-muted-foreground">
-                Mande mensagens como "Gastei 50 reais em pizza" ou envie foto da nota fiscal.
+                Mande mensagens como &quot;Gastei 50 reais em pizza&quot; ou envie foto da nota fiscal.
               </p>
             </div>
           </div>

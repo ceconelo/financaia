@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useSearchParams } from 'next/navigation';
@@ -47,8 +46,9 @@ interface Pagination {
 
 export default function DashboardPage() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const urlToken = searchParams.get('token');
   
+  const [token, setToken] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,16 +63,39 @@ export default function DashboardPage() {
   const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
-      return;
+    // Token handling logic
+    let activeToken = urlToken;
+
+    if (activeToken) {
+      // New token from URL: Store it and clean URL
+      localStorage.setItem('dashboardToken', activeToken);
+      window.history.replaceState({}, '', '/dashboard'); // Clean URL
+    } else {
+      // No token in URL: Try to get from storage
+      activeToken = localStorage.getItem('dashboardToken');
     }
 
-    // Buscar estatísticas com filtro de mês/ano e token
-    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}&token=${token}`)
+    if (activeToken) {
+      setToken(activeToken);
+    } else {
+      setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
+      setLoading(false);
+    }
+  }, [urlToken]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    // Buscar estatísticas com filtro de mês/ano e token (via Header)
+    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(async res => {
         if (!res.ok) {
-          if (res.status === 401) throw new Error('Token inválido ou expirado.');
+          if (res.status === 401) {
+            localStorage.removeItem('dashboardToken'); // Clear invalid token
+            throw new Error('Token inválido ou expirado.');
+          }
           throw new Error('Erro ao carregar dados.');
         }
         return res.json();
@@ -85,7 +108,9 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
 
     // Buscar dados do gráfico
-    fetch(`http://localhost:4000/api/transactions/chart?days=7&token=${token}`)
+    fetch(`http://localhost:4000/api/transactions/chart?days=7`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(async res => {
         if (!res.ok) throw new Error('Erro ao carregar gráfico.');
         return res.json();
@@ -101,15 +126,21 @@ export default function DashboardPage() {
   }, [selectedMonth, selectedYear, token]);
 
   const fetchStats = () => {
+    if (!token) return;
     setLoading(true);
-    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}&token=${token}`)
+    fetch(`http://localhost:4000/api/stats?month=${selectedMonth}&year=${selectedYear}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setStats(data))
       .finally(() => setLoading(false));
   };
 
   const fetchTransactions = (page = 1) => {
-    fetch(`http://localhost:4000/api/transactions?token=${token}&month=${selectedMonth}&year=${selectedYear}&page=${page}&limit=10`)
+    if (!token) return;
+    fetch(`http://localhost:4000/api/transactions?month=${selectedMonth}&year=${selectedYear}&page=${page}&limit=10`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => {
         setTransactions(data.transactions);
@@ -119,13 +150,15 @@ export default function DashboardPage() {
   };
 
   const handleResetMonth = async () => {
+    if (!token) return;
     if (!confirm('Tem certeza que deseja apagar TODOS os dados deste mês? Esta ação não pode ser desfeita.')) {
       return;
     }
 
     try {
-      const res = await fetch(`http://localhost:4000/api/transactions/reset?token=${token}&month=${selectedMonth}&year=${selectedYear}`, {
-        method: 'DELETE'
+      const res = await fetch(`http://localhost:4000/api/transactions/reset?month=${selectedMonth}&year=${selectedYear}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (res.ok) {
@@ -143,12 +176,15 @@ export default function DashboardPage() {
 
   const handleEditTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingTransaction) return;
+    if (!editingTransaction || !token) return;
 
     try {
-      const res = await fetch(`http://localhost:4000/api/transactions/${editingTransaction.id}?token=${token}`, {
+      const res = await fetch(`http://localhost:4000/api/transactions/${editingTransaction.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           amount: editingTransaction.amount,
           category: editingTransaction.category,
@@ -172,11 +208,13 @@ export default function DashboardPage() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
+    if (!token) return;
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
     try {
-      const res = await fetch(`http://localhost:4000/api/transactions/${id}?token=${token}`, {
-        method: 'DELETE'
+      const res = await fetch(`http://localhost:4000/api/transactions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (res.ok) {
@@ -320,7 +358,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-muted-foreground">Saldo</p>
                 <Wallet className="h-4 w-4 text-blue-500" />
               </div>
-              <div className={`text-2xl font-bold mt-2 ${stats?.financials?.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              <div className={`text-2xl font-bold mt-2 ${(stats?.financials?.balance ?? 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 R$ {stats?.financials?.balance.toFixed(2) || '0.00'}
               </div>
             </CardContent>

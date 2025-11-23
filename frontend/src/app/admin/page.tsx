@@ -18,17 +18,34 @@ export default function AdminPage() {
   const fetchData = async () => {
     try {
       const [waitlistRes, activeRes] = await Promise.all([
-        fetch('http://localhost:4000/api/admin/waitlist'),
-        fetch('http://localhost:4000/api/admin/active-users')
+        fetch('http://localhost:4000/api/admin/waitlist', {
+          headers: {
+            'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+          }
+        }),
+        fetch('http://localhost:4000/api/admin/active-users', {
+          headers: {
+            'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+          }
+        })
       ]);
+      
+      if (!waitlistRes.ok || !activeRes.ok) {
+        throw new Error('Unauthorized or failed to fetch');
+      }
       
       const waitlistData = await waitlistRes.json();
       const activeData = await activeRes.json();
       
-      setUsers(waitlistData);
-      setActiveUsers(activeData);
-    } catch {
-      console.error('Erro ao buscar dados');
+      // Ensure data is array before setting state
+      setUsers(Array.isArray(waitlistData) ? waitlistData : []);
+      setActiveUsers(Array.isArray(activeData) ? activeData : []);
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+      // Set empty arrays on error
+      setUsers([]);
+      setActiveUsers([]);
+      alert('Erro ao carregar dados. Verifique se você tem permissão de admin.');
     } finally {
       setLoading(false);
     }
@@ -38,7 +55,10 @@ export default function AdminPage() {
     try {
       await fetch('http://localhost:4000/api/admin/approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+        },
         body: JSON.stringify({ userId })
       });
       // Atualizar listas
@@ -59,7 +79,10 @@ export default function AdminPage() {
     try {
       await fetch('http://localhost:4000/api/admin/revoke', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+        },
         body: JSON.stringify({ userId })
       });
       // Atualizar listas
