@@ -5,6 +5,8 @@ export const getStats = async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
         const userId = user.id;
+        const isFamilyAdmin = user.familyGroup?.adminId === user.id;
+        const userFilter = isFamilyAdmin ? { user: { familyGroupId: user.familyGroupId } } : { userId };
 
         const totalUsers = await prisma.user.count();
 
@@ -20,29 +22,29 @@ export const getStats = async (req: Request, res: Response) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Transactions Today (USER ONLY)
+        // Transactions Today
         const transactionsToday = await prisma.transaction.count({
             where: {
-                userId,
+                ...userFilter,
                 createdAt: { gte: today }
             }
         });
 
-        // Transactions Week (USER ONLY)
+        // Transactions Week
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
 
         const transactionsWeek = await prisma.transaction.count({
             where: {
-                userId,
+                ...userFilter,
                 createdAt: { gte: weekAgo }
             }
         });
 
-        // Transactions for the selected Month (USER ONLY)
+        // Transactions for the selected Month
         const transactionsMonth = await prisma.transaction.count({
             where: {
-                userId,
+                ...userFilter,
                 createdAt: {
                     gte: startDate,
                     lte: endDate
@@ -50,10 +52,10 @@ export const getStats = async (req: Request, res: Response) => {
             }
         });
 
-        // Financials for the selected Month (USER ONLY)
+        // Financials for the selected Month
         const periodTransactions = await prisma.transaction.findMany({
             where: {
-                userId,
+                ...userFilter,
                 createdAt: {
                     gte: startDate,
                     lte: endDate
@@ -110,7 +112,7 @@ export const getStats = async (req: Request, res: Response) => {
                 role: user.role,
                 id: user.id,
                 familyGroupId: user.familyGroupId,
-                isFamilyAdmin: user.familyGroupId ? (await prisma.familyGroup.findUnique({ where: { id: user.familyGroupId } }))?.adminId === user.id : false
+                isFamilyAdmin
             }
         });
     } catch (error) {

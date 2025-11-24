@@ -7,7 +7,9 @@ export const getRecentTransactions = async (req: Request, res: Response) => {
         const user = (req as any).user;
 
         const transactions = await prisma.transaction.findMany({
-            where: { userId: user.id },
+            where: (user.familyGroup?.adminId === user.id)
+                ? { user: { familyGroupId: user.familyGroupId } }
+                : { userId: user.id },
             take: limit,
             orderBy: {
                 createdAt: 'desc'
@@ -38,11 +40,18 @@ export const getChartData = async (req: Request, res: Response) => {
         startDate.setDate(startDate.getDate() - days);
         startDate.setHours(0, 0, 0, 0);
 
+        const whereClause: any = {
+            createdAt: { gte: startDate }
+        };
+
+        if (user.familyGroup?.adminId === user.id) {
+            whereClause.user = { familyGroupId: user.familyGroupId };
+        } else {
+            whereClause.userId = userId;
+        }
+
         const transactions = await prisma.transaction.findMany({
-            where: {
-                userId,
-                createdAt: { gte: startDate }
-            },
+            where: whereClause,
             select: {
                 type: true,
                 amount: true,
@@ -146,30 +155,40 @@ export const getTransactions = async (req: Request, res: Response) => {
         const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
         // Get total count
-        const total = await prisma.transaction.count({
-            where: {
-                userId: user.id,
-                createdAt: {
-                    gte: startDate,
-                    lte: endDate
-                }
+        const whereClause: any = {
+            createdAt: {
+                gte: startDate,
+                lte: endDate
             }
+        };
+
+        if (user.familyGroup?.adminId === user.id) {
+            whereClause.user = { familyGroupId: user.familyGroupId };
+        } else {
+            whereClause.userId = user.id;
+        }
+
+        // Get total count
+        const total = await prisma.transaction.count({
+            where: whereClause
         });
 
         // Get paginated transactions
         const transactions = await prisma.transaction.findMany({
-            where: {
-                userId: user.id,
-                createdAt: {
-                    gte: startDate,
-                    lte: endDate
-                }
-            },
+            where: whereClause,
             orderBy: {
                 createdAt: 'desc'
             },
             skip: (page - 1) * limit,
-            take: limit
+            take: limit,
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        phoneNumber: true
+                    }
+                }
+            }
         });
 
         res.json({

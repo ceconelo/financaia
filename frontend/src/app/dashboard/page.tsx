@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, DollarSign, Activity, Calendar, ArrowUpCircle, ArrowDownCircle, Wallet, Trash2, Edit, ChevronLeft, ChevronRight, Settings, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useSearchParams } from 'next/navigation';
@@ -35,6 +35,10 @@ interface Transaction {
   category: string;
   description: string | null;
   createdAt: string;
+  user?: {
+    name: string | null;
+    phoneNumber: string;
+  };
 }
 
 interface Pagination {
@@ -61,6 +65,21 @@ export default function DashboardPage() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  
+  const [showColumnFilter, setShowColumnFilter] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    date: true,
+    description: true,
+    category: true,
+    type: true,
+    amount: true,
+    user: true,
+    actions: true
+  });
+
+  const toggleColumn = (key: keyof typeof visibleColumns) => {
+    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     // Token handling logic
@@ -495,66 +514,119 @@ export default function DashboardPage() {
                 {pagination.total} registros
               </span>
             </div>
+            <div className="relative mt-2 md:mt-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex items-center gap-2 text-xs h-8"
+                onClick={() => setShowColumnFilter(!showColumnFilter)}
+              >
+                <Settings className="h-3 w-3" />
+                Colunas
+              </Button>
+              
+              {showColumnFilter && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border p-2 z-20 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground px-2 py-1 mb-1">Exibir Colunas</p>
+                    {[
+                      { key: 'date', label: 'Data' },
+                      { key: 'description', label: 'Descrição' },
+                      { key: 'category', label: 'Categoria' },
+                      { key: 'type', label: 'Tipo' },
+                      { key: 'amount', label: 'Valor' },
+                      { key: 'user', label: 'Usuário' },
+                      { key: 'actions', label: 'Ações' },
+                    ].map((col) => (
+                      <button
+                        key={col.key}
+                        onClick={() => toggleColumn(col.key as keyof typeof visibleColumns)}
+                        className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded hover:bg-gray-50 text-gray-700"
+                      >
+                        <span>{col.label}</span>
+                        {visibleColumns[col.key as keyof typeof visibleColumns] && <Check className="h-3 w-3 text-blue-600" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50/50">
                 <tr>
-                  <th className="text-left py-3 px-6 font-medium text-muted-foreground">Data</th>
-                  <th className="text-left py-3 px-6 font-medium text-muted-foreground">Descrição</th>
-                  <th className="text-left py-3 px-6 font-medium text-muted-foreground">Categoria</th>
-                  <th className="text-left py-3 px-6 font-medium text-muted-foreground">Tipo</th>
-                  <th className="text-right py-3 px-6 font-medium text-muted-foreground">Valor</th>
-                  <th className="text-center py-3 px-6 font-medium text-muted-foreground w-[100px]">Ações</th>
+                  {visibleColumns.date && <th className="text-left py-3 px-6 font-medium text-muted-foreground">Data</th>}
+                  {visibleColumns.description && <th className="text-left py-3 px-6 font-medium text-muted-foreground">Descrição</th>}
+                  {visibleColumns.category && <th className="text-left py-3 px-6 font-medium text-muted-foreground">Categoria</th>}
+                  {visibleColumns.type && <th className="text-left py-3 px-6 font-medium text-muted-foreground">Tipo</th>}
+                  {visibleColumns.amount && <th className="text-right py-3 px-6 font-medium text-muted-foreground">Valor</th>}
+                  {visibleColumns.user && <th className="text-left py-3 px-6 font-medium text-muted-foreground">Usuário</th>}
+                  {visibleColumns.actions && <th className="text-center py-3 px-6 font-medium text-muted-foreground w-[100px]">Ações</th>}
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {transactions.map(t => (
                   <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="py-3 px-6 text-gray-600">
-                      {new Date(t.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                    </td>
-                    <td className="py-3 px-6 font-medium text-gray-900">{t.description || '-'}</td>
-                    <td className="py-3 px-6 capitalize text-gray-600">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        {t.category}
-                      </span>
-                    </td>
-                    <td className="py-3 px-6">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        t.type === 'INCOME' 
-                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20' 
-                          : 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20'
-                      }`}>
-                        {t.type === 'INCOME' ? 'Receita' : 'Despesa'}
-                      </span>
-                    </td>
-                    <td className={`py-3 px-6 text-right font-semibold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      R$ {t.amount.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-6">
-                      <div className="flex justify-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-                          onClick={() => {
-                            setEditingTransaction(t);
-                            setShowEditModal(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDeleteTransaction(t.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+                    {visibleColumns.date && (
+                      <td className="py-3 px-6 text-gray-600">
+                        {new Date(t.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </td>
+                    )}
+                    {visibleColumns.description && <td className="py-3 px-6 font-medium text-gray-900">{t.description || '-'}</td>}
+                    {visibleColumns.category && (
+                      <td className="py-3 px-6 capitalize text-gray-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          {t.category}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.type && (
+                      <td className="py-3 px-6">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          t.type === 'INCOME' 
+                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20' 
+                            : 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20'
+                        }`}>
+                          {t.type === 'INCOME' ? 'Receita' : 'Despesa'}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.amount && (
+                      <td className={`py-3 px-6 text-right font-semibold ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        R$ {t.amount.toFixed(2)}
+                      </td>
+                    )}
+                    {visibleColumns.user && (
+                      <td className="py-3 px-6 text-gray-600 text-xs">
+                        {t.user?.name || t.user?.phoneNumber || 'Eu'}
+                      </td>
+                    )}
+                    {visibleColumns.actions && (
+                      <td className="py-3 px-6">
+                        <div className="flex justify-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={() => {
+                              setEditingTransaction(t);
+                              setShowEditModal(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => handleDeleteTransaction(t.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

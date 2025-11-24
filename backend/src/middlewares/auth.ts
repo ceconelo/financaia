@@ -16,7 +16,8 @@ export const authenticate = async (req: express.Request, res: express.Response, 
         }
 
         const user = await prisma.user.findUnique({
-            where: { dashboardToken: token }
+            where: { dashboardToken: token },
+            include: { familyGroup: true }
         });
 
         if (!user) {
