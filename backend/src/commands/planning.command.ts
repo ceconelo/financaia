@@ -1,5 +1,7 @@
 import { createPlan, getPlans, approvePlan, updatePlan, deletePlan } from '../services/planning.js';
 import { sessionService } from '../services/session.js';
+import { getMonthlyExpenses } from '../services/finance.js';
+import { getFamilyReport } from '../services/family.js';
 import { Markup } from 'telegraf';
 
 export const handlePlanningCallbacks = async (ctx: any, user: any) => {
@@ -232,6 +234,25 @@ export const handlePlanningCommands = async (
 // Helper for Telegram to get the menu
 export const getPlanningMenu = async (userId: string) => {
     const { activePlans, pendingPlans } = await getPlans(userId);
+
+    // Get current month expenses for progress calculation
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // Try to get family report first
+    let byCategory: Record<string, number> = {};
+    const familyReport = await getFamilyReport(userId);
+
+    if ('error' in familyReport) {
+        // User not in family, use personal expenses
+        const result = await getMonthlyExpenses(userId, month, year);
+        byCategory = result.byCategory;
+    } else {
+        // User in family, use family expenses
+        byCategory = familyReport.byCategory!;
+    }
+
     let msg = `🎯 *Planejamento Financeiro*\n\n`;
 
     if (activePlans.length === 0 && pendingPlans.length === 0) {
@@ -239,12 +260,34 @@ export const getPlanningMenu = async (userId: string) => {
     } else {
         if (activePlans.length > 0) {
             msg += `*Metas Ativas:*\n`;
-            activePlans.forEach((p: any) => {
-                msg += `• ${p.category}: ${p.type === 'PERCENTAGE' ? p.amount + '%' : 'R$ ' + p.amount.toFixed(2)}\n`;
-            });
+
+            for (const p of activePlans) {
+                // Calculate progress (Case Insensitive Match)
+                const categoryKey = Object.keys(byCategory).find(k => k.toLowerCase() === p.category.toLowerCase()) || p.category;
+                const spent = byCategory[categoryKey] || 0;
+
+                let percentage = 0;
+                let remaining = 0;
+                let bar = '';
+
+                if (p.type === 'FIXED') {
+                    percentage = Math.min(100, Math.max(0, (spent / p.amount) * 100));
+                    remaining = Math.max(0, p.amount - spent);
+                    bar = generateProgressBar(percentage);
+
+                    msg += `• ${p.category}: R$ ${p.amount.toFixed(2)}\n`;
+                    msg += `${bar} ${percentage.toFixed(0)}%\n`;
+                    msg += `💰 Restam: R$ ${remaining.toFixed(2)}\n\n`;
+                } else {
+                    // For percentage based, we just show the target
+                    msg += `• ${p.category}: ${p.amount}%\n`;
+                    msg += `(Meta baseada em % da renda)\n\n`;
+                }
+            }
         }
+
         if (pendingPlans.length > 0) {
-            msg += `\n⏳ *Pendentes:*\n`;
+            msg += `⏳ *Pendentes:*\n`;
             pendingPlans.forEach((p: any) => {
                 msg += `• ${p.category}: ${p.amount}\n`;
             });
@@ -257,4 +300,15 @@ export const getPlanningMenu = async (userId: string) => {
     ]);
 
     return { msg, markup };
+}
+
+function generateProgressBar(percentage: number): string {
+    const totalBlocks = 10;
+    const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+    const emptyBlocks = totalBlocks - filledBlocks;
+
+    const filled = '🟩'.repeat(filledBlocks);
+    const empty = '⬜'.repeat(emptyBlocks);
+
+    return `[${filled}${empty}]`;
 }

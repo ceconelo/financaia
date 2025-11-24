@@ -12,6 +12,24 @@ export class TelegramService {
   constructor(token: string) {
     this.bot = new Telegraf(token);
     this.setupListeners();
+    this.setupCommands();
+  }
+
+  private async setupCommands() {
+    try {
+      await this.bot.telegram.setMyCommands([
+        { command: 'start', description: 'Iniciar o bot' },
+        { command: 'saldo', description: 'Ver saldo atual' },
+        { command: 'resumo', description: 'Relatório mensal' },
+        { command: 'dashboard', description: 'Link do dashboard' },
+        { command: 'planejamento', description: 'Metas e orçamento' },
+        { command: 'familia', description: 'Gerenciar família' },
+        { command: 'ajuda', description: 'Ver ajuda' }
+      ]);
+      console.log('Comandos do menu configurados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao configurar comandos:', error);
+    }
   }
 
   private getMainMenu() {
