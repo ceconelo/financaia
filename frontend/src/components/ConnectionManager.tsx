@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import QRCode from 'qrcode';
+import { io } from 'socket.io-client';
 import { Wifi, WifiOff, Loader2, RefreshCw } from 'lucide-react';
 
 interface ConnectionStatus {
@@ -23,8 +24,8 @@ export default function ConnectionManager() {
   });
 
   useEffect(() => {
-    const { io } = require('socket.io-client');
-    const newSocket = io('http://localhost:4000');
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const newSocket = io(apiUrl);
 
     newSocket.on('connect', () => {
       console.log('Conectado ao WebSocket');
@@ -46,7 +47,7 @@ export default function ConnectionManager() {
     });
 
     // Buscar status inicial
-    fetch('http://localhost:4000/api/connection/status')
+    fetch(`${apiUrl}/api/connection/status`)
       .then(res => res.json())
       .then(data => setStatus(data))
       .catch(err => console.error('Erro ao buscar status:', err));

@@ -5,6 +5,9 @@ import Navbar from "@/components/Navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
+
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "FinancaIA - Controle Financeiro via WhatsApp",
   description: "Assistente financeiro inteligente com IA via WhatsApp",

@@ -31,8 +31,13 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
+# Copy entrypoint script
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 # Expose port
 EXPOSE 4000
 
 # Start application
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["npm", "start"]

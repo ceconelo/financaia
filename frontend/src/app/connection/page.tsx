@@ -1,11 +1,6 @@
-'use client';
+import ConnectionManager from '@/components/ConnectionManager';
 
-import dynamic from 'next/dynamic';
-
-const ConnectionManager = dynamic(() => import('@/components/ConnectionManager'), {
-  ssr: false,
-  loading: () => <div className="container mx-auto p-8 text-center">Carregando interface de conexão...</div>
-});
+export const dynamic = 'force-dynamic';
 
 export default function ConnectionPage() {
   return <ConnectionManager />;
