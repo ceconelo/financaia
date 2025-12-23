@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+build
+.env
+.git
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+coverage
+public/sw.js
+public/workbox-*.js
