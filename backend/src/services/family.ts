@@ -90,7 +90,7 @@ export async function getFamilyReport(userId: string) {
   const transactions = await prisma.transaction.findMany({
     where: {
       user: { familyGroupId: familyId },
-      type: 'EXPENSE',
+      // Remover filtro de tipo para pegar tudo
       date: {
         gte: startDate,
         lte: endDate,
@@ -99,12 +99,18 @@ export async function getFamilyReport(userId: string) {
     include: { user: true },
   });
 
-  const total = transactions.reduce((acc, t) => acc + t.amount, 0);
-  
+  const expenses = transactions.filter(t => t.type === 'EXPENSE');
+  const incomes = transactions.filter(t => t.type === 'INCOME');
+
+  const totalExpense = expenses.reduce((acc, t) => acc + t.amount, 0);
+  const totalIncome = incomes.reduce((acc, t) => acc + t.amount, 0);
+  const totalAvailable = totalIncome - totalExpense;
+
   const byMember: Record<string, number> = {};
   const byCategory: Record<string, number> = {};
 
-  transactions.forEach(t => {
+  // Processar apenas despesas para os gráficos de gasto
+  expenses.forEach(t => {
     const memberName = t.user.name || t.user.phoneNumber;
     byMember[memberName] = (byMember[memberName] || 0) + t.amount;
     byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
@@ -124,7 +130,7 @@ export async function getFamilyReport(userId: string) {
     // Normalizar categoria para comparar (case insensitive)
     const categoryKey = Object.keys(byCategory).find(k => k.toLowerCase() === plan.category.toLowerCase()) || plan.category;
     const spent = byCategory[categoryKey] || 0;
-    
+
     if (plan.type === 'FIXED') {
       const limit = plan.amount;
       const remaining = Math.max(0, limit - spent);
@@ -136,7 +142,9 @@ export async function getFamilyReport(userId: string) {
   return {
     familyName: user.familyGroup.name,
     inviteCode: user.familyGroup.inviteCode,
-    total,
+    totalIncome,
+    totalExpense,
+    totalAvailable,
     byMember,
     byCategory,
     budgets,

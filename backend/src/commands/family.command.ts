@@ -48,7 +48,9 @@ export const handleFamilyCommands = async (
             let msg = `👨‍👩‍👧‍👦 *Família: ${report.familyName}*\n`;
             msg += `🔑 Código: \`${report.inviteCode}\`\n`;
             msg += `👥 ${report.memberCount} Membros\n\n`;
-            msg += `💸 *Total Mês: R$ ${report.total!.toFixed(2)}*\n`;
+            msg += `💰 *Saldo: R$ ${report.totalIncome!.toFixed(2)}*\n`;
+            msg += `💸 *Total Despesas: R$ ${report.totalExpense!.toFixed(2)}*\n`;
+            msg += `✅ *Total Disponível: R$ ${report.totalAvailable!.toFixed(2)}*\n`;
             msg += `──────────────────\n`;
 
             msg += `👤 *Por Membro:*\n`;

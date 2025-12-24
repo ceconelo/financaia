@@ -52,9 +52,9 @@ export const handleFinanceCommands = async (
         // Verificar se faz parte de família
         const familyReport = await getFamilyReport(userId);
 
-        if (!familyReport.error && familyReport.total !== undefined) {
+        if (!familyReport.error && familyReport.totalExpense !== undefined) {
             report += `\n👨‍👩‍👧‍👦 *Família: ${familyReport.familyName}*\n`;
-            report += `💸 Total Familiar: R$ ${familyReport.total.toFixed(2)}\n`;
+            report += `💸 Total Familiar: R$ ${familyReport.totalExpense.toFixed(2)}\n`;
             report += `ℹ️ Digite */familia* para detalhes`;
         }
 
