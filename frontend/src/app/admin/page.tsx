@@ -14,18 +14,21 @@ export default function AdminPage() {
   const [users, setUsers] = useState<WaitlistUser[]>([]);
   const [activeUsers, setActiveUsers] = useState<WaitlistUser[]>([]);
   const [loading, setLoading] = useState(true);
+   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const adminSecret = process.env.ADMIN_SECRET || 'admin123';
 
   const fetchData = async () => {
     try {
+     
       const [waitlistRes, activeRes] = await Promise.all([
-        fetch('http://localhost:4000/api/admin/waitlist', {
+        fetch(`${apiUrl}/api/admin/waitlist`, {
           headers: {
-            'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+            'x-admin-secret': adminSecret // TODO: Use environment variable in production
           }
         }),
-        fetch('http://localhost:4000/api/admin/active-users', {
+        fetch(`${apiUrl}/api/admin/active-users`, {
           headers: {
-            'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+            'x-admin-secret': adminSecret // TODO: Use environment variable in production
           }
         })
       ]);
@@ -53,11 +56,11 @@ export default function AdminPage() {
 
   const approveUser = async (userId: string) => {
     try {
-      await fetch('http://localhost:4000/api/admin/approve', {
+      await fetch(`${apiUrl}/api/admin/approve`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+          'x-admin-secret': adminSecret // TODO: Use environment variable in production
         },
         body: JSON.stringify({ userId })
       });
@@ -77,11 +80,11 @@ export default function AdminPage() {
     if (!confirm('Tem certeza que deseja revogar o acesso deste usuário?')) return;
     
     try {
-      await fetch('http://localhost:4000/api/admin/revoke', {
+      await fetch(`${apiUrl}/api/admin/revoke`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-admin-secret': 'admin123' // TODO: Use environment variable in production
+          'x-admin-secret': adminSecret // TODO: Use environment variable in production
         },
         body: JSON.stringify({ userId })
       });
