@@ -19,7 +19,8 @@ export const handleFinanceCommands = async (
     // Dashboard
     if (lowerText === 'dashboard' || lowerText === '/dashboard') {
         const token = await getDashboardToken(userId);
-        const link = `http://localhost:3000/dashboard?token=${token}`;
+        const frontendUrl = process.env.FRONTEND_URL || 'https://frontend-pgg48k4s8k0cw4gcosook80c.iaconnecto.com';
+        const link = `${frontendUrl}/dashboard?token=${token}`;
 
         await reply(`📊 *Seu Dashboard Pessoal*\n\nAcesse seu painel exclusivo através deste link:\n\n${link}\n\n⚠️ *Atenção:* Não compartilhe este link com ninguém.`);
         return true;
