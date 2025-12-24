@@ -54,7 +54,6 @@ interface DashboardContentProps {
 
 export default function DashboardPage({ apiUrl }: DashboardContentProps) {
   const searchParams = useSearchParams();
-  const urlToken = searchParams.get('token');
   
   const [token, setToken] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -86,25 +85,27 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
   };
 
   useEffect(() => {
-    // Token handling logic
-    let activeToken = urlToken;
+    const tokenFromUrl = searchParams.get('token');
 
-    if (activeToken) {
-      // New token from URL: Store it and clean URL
-      localStorage.setItem('dashboardToken', activeToken);
-      window.history.replaceState({}, '', '/dashboard'); // Clean URL
+    if (tokenFromUrl) {
+      // 1. Token na URL: Prioridade máxima. Salva e usa.
+      localStorage.setItem('dashboardToken', tokenFromUrl);
+      setToken(tokenFromUrl);
+      
+      // Limpar URL visualmente
+      window.history.replaceState({}, '', '/dashboard');
     } else {
-      // No token in URL: Try to get from storage
-      activeToken = localStorage.getItem('dashboardToken');
+      // 2. Sem token na URL: Tenta recuperar do storage
+      const storedToken = localStorage.getItem('dashboardToken');
+      if (storedToken) {
+        setToken(storedToken);
+      } else {
+        // 3. Sem token em lugar nenhum
+        setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
+        setLoading(false);
+      }
     }
-
-    if (activeToken) {
-      setToken(activeToken);
-    } else {
-      setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
-      setLoading(false);
-    }
-  }, [urlToken]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!token) return;
