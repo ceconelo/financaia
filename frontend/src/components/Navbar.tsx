@@ -1,7 +1,6 @@
 'use client';
 
 import Link from "next/link";
-import { LayoutDashboard, Wifi, Home, MessageSquare } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -42,7 +41,6 @@ export default function Navbar() {
   }, [token]);
 
   const isAdmin = user?.role === 'ADMIN';
-  const isTokenless = !token;
 
   // If user is authenticated (has token) but not admin, hide the navbar
   if (user && !isAdmin) {
@@ -57,42 +55,7 @@ export default function Navbar() {
             FinancaIA
           </Link>
           <div className="flex gap-6">
-            <Link 
-              href="/" 
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Home className="h-4 w-4" />
-              <span>Home</span>
-            </Link>
-            
-            {(user || isAdmin) && (
-              <Link 
-                href="/dashboard" 
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard</span>
-              </Link>
-            )}
-            
-            {(isAdmin || isTokenless) && (
-              <>
-                <Link 
-                  href="/chat" 
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Chat de Teste</span>
-                </Link>
-                <Link 
-                  href="/connection" 
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Wifi className="h-4 w-4" />
-                  <span>Conexão</span>
-                </Link>
-              </>
-            )}
+            {/* Menu items removed as requested */}
           </div>
         </div>
       </div>

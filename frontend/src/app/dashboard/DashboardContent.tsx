@@ -88,22 +88,10 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
     const tokenFromUrl = searchParams.get('token');
 
     if (tokenFromUrl) {
-      // 1. Token na URL: Prioridade máxima. Salva e usa.
-      localStorage.setItem('dashboardToken', tokenFromUrl);
       setToken(tokenFromUrl);
-      
-      // Limpar URL visualmente
-      window.history.replaceState({}, '', '/dashboard');
     } else {
-      // 2. Sem token na URL: Tenta recuperar do storage
-      const storedToken = localStorage.getItem('dashboardToken');
-      if (storedToken) {
-        setToken(storedToken);
-      } else {
-        // 3. Sem token em lugar nenhum
-        setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
-        setLoading(false);
-      }
+      setError('Acesso não autorizado. Por favor, acesse através do link enviado pelo Bot no Telegram.');
+      setLoading(false);
     }
   }, [searchParams]);
 
