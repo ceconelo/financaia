@@ -256,7 +256,7 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
     { value: 12, label: 'Dezembro' },
   ];
 
-  const years = [2023, 2024, 2025];
+  const years = [2023, 2024, 2025, 2026];
 
   if (loading) {
     return (

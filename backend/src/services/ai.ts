@@ -27,12 +27,35 @@ export interface TransactionData {
 }
 
 const CATEGORIES = {
-  'renda': 'Salário, freelance, vendas, restituições, dividendos ou qualquer entrada de dinheiro.',
-  'gastos essenciais': 'Moradia (aluguel, condomínio), contas (luz, água, internet), mercado, farmácia, transporte obrigatório (combustível trabalho, ônibus).',
-  'estilo de vida': 'Lazer, comer fora, restaurantes, iFood, bares, cinema, viagens, compras pessoais, streaming, academia.',
-  'poupança': 'Investimentos, reserva de emergência, aplicações financeiras.',
-  'estudos': 'Faculdade, cursos, livros, material escolar, idiomas.',
-  'doação': 'Caridade, dízimo, ajuda a terceiros, presentes.'
+  'aluguel': 'Pagamento de aluguel residencial.',
+  'condomínio': 'Taxa de condomínio.',
+  'saúde': 'Farmácia, consultas, exames, plano de saúde.',
+  'mercado': 'Supermercado, feira, compras de mantimentos.',
+  'celular': 'Conta de celular, recarga, plano de telefone.',
+  'contas residenciais': 'Energia elétrica (luz), água, gás, internet.',
+  'manutenção veículo': 'Oficina, peças, consertos de carro ou moto.',
+  'combustivel': 'Posto de gasolina, álcool, diesel, abastecimento.',
+  'obrigações veículo': 'IPVA, licenciamento, seguro obrigatório, multas.',
+  'padaria': 'Gastos em padarias, pães, lanches rápidos.',
+  'galão de agua': 'Compra de água mineral em galão.',
+  'manuella': 'Gastos específicos relacionados à Manuella.',
+  'capoeira': 'Mensalidades ou equipamentos de capoeira.',
+  'bares e restaurantes': 'Comer fora, restaurantes, bares, iFood, lanchonetes.',
+  'lazer': 'Cinema, shows, passeios, entretenimento.',
+  'compras': 'Vestuário, eletrônicos, presentes (geral), itens para casa.',
+  'cuidados pessoais': 'Cabeleireiro, barbearia, estética, cosméticos.',
+  'viagem': 'Passagens, hospedagem, gastos em viagens.',
+  'presentes': 'Compra de presentes para outras pessoas.',
+  'família': 'Gastos gerais de manutenção da família.',
+  'filhos': 'Escola, brinquedos, roupas e outros gastos com filhos.',
+  'outros gastos': 'Despesas diversas que não se encaixam nas demais.',
+  'serviços': 'Assinaturas de streaming, serviços prestados, reparos domésticos.',
+  'colégio': 'Mensalidade escolar, materiais didáticos, uniformes.',
+  'thiago': 'Gastos específicos relacionados ao Thiago.',
+  'roberta': 'Gastos específicos relacionados à Roberta.',
+  'rafaella': 'Gastos específicos relacionados à Rafaella.',
+  'impostos': 'IPVA (se não em obrigações), IPTU, IRPF, taxas diversas.',
+  'renda': 'Salário, bônus, recebimentos, vendas, dividendos.'
 };
 
 const JSON_FORMAT = `{
