@@ -75,6 +75,32 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
   const [selectedYear, setSelectedYear] = useState(defaultCycle.y);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  
+  const monthsLabels = [ 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro' ];
+  
+  const cycles = (() => {
+    const list = [];
+    const baseDate = new Date();
+    // Ajustar baseDate se já estivermos no próximo ciclo (dia 9 inicia o ciclo do mês seguinte)
+    if (baseDate.getDate() >= 9) {
+      baseDate.setMonth(baseDate.getMonth() + 1);
+    }
+    
+    // Gerar 6 meses passados, o atual e 5 meses futuros (Total 12 meses/ciclos)
+    for (let i = -6; i <= 5; i++) {
+      const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+      list.push({
+        label: `${monthsLabels[m-1]} ${y}`,
+        month: m,
+        year: y,
+        key: `${y}-${m}`
+      });
+    }
+    return list;
+  })();
+
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   
@@ -250,22 +276,6 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
     }
   };
 
-  const months = [
-    { value: 1, label: 'Janeiro' },
-    { value: 2, label: 'Fevereiro' },
-    { value: 3, label: 'Março' },
-    { value: 4, label: 'Abril' },
-    { value: 5, label: 'Maio' },
-    { value: 6, label: 'Junho' },
-    { value: 7, label: 'Julho' },
-    { value: 8, label: 'Agosto' },
-    { value: 9, label: 'Setembro' },
-    { value: 10, label: 'Outubro' },
-    { value: 11, label: 'Novembro' },
-    { value: 12, label: 'Dezembro' },
-  ];
-
-  const years = [2023, 2024, 2025, 2026];
 
   if (loading) {
     return (
@@ -313,43 +323,36 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
               </span>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border">
-              <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
-              <select 
-                className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer outline-none text-gray-600 font-medium"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              >
-                {months.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <div className="w-px h-4 bg-gray-300 mx-1"></div>
-              <select 
-                className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer outline-none text-gray-600 font-medium"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              >
-                {years.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+                    <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border">
+                <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
+                <select 
+                  className="bg-transparent border-none text-sm focus:ring-0 cursor-pointer outline-none text-gray-600 font-medium min-w-[140px]"
+                  value={`${selectedYear}-${selectedMonth}`}
+                  onChange={(e) => {
+                    const [y, m] = e.target.value.split('-').map(Number);
+                    setSelectedYear(y);
+                    setSelectedMonth(m);
+                  }}
+                >
+                  {cycles.map(c => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
 
-            {canReset && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={handleResetMonth}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                title="Resetar dados do mês"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+              {canReset && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={handleResetMonth}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Resetar dados do mês"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
         </div>
 
         {/* Summary Cards */}
