@@ -62,8 +62,17 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
   const [loading, setLoading] = useState(true);
   
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const defaultCycle = (() => {
+    let m = now.getMonth() + 1;
+    let y = now.getFullYear();
+    if (now.getDate() >= 9) {
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+    return { m, y };
+  })();
+  const [selectedMonth, setSelectedMonth] = useState(defaultCycle.m);
+  const [selectedYear, setSelectedYear] = useState(defaultCycle.y);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -295,9 +304,14 @@ export default function DashboardPage({ apiUrl }: DashboardContentProps) {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dashboard FinancaIA</h1>
-            <p className="text-sm text-muted-foreground">
-              {stats?.user?.name ? `Bem-vindo de volta, ${stats?.user.name}` : 'Visão geral do FinancaIA'}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-muted-foreground">
+                {stats?.user?.name ? `Bem-vindo de volta, ${stats?.user.name}` : 'Visão geral do FinancaIA'}
+              </p>
+              <span className="hidden md:inline text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium border border-blue-100">
+                Ciclo: 09/{[ 'Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov'][selectedMonth - 1]} a 08/{['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][selectedMonth - 1]}
+              </span>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">

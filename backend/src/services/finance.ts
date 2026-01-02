@@ -1,4 +1,5 @@
 import { PrismaClient, TransactionType } from '@prisma/client';
+import { getCycleRange } from './date.service.js';
 
 export const prisma = new PrismaClient();
 
@@ -66,8 +67,7 @@ export async function getBalance(userId: string) {
 }
 
 export async function getMonthlyExpenses(userId: string, month: number, year: number) {
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  const { startDate, endDate } = getCycleRange(month, year);
 
   const expenses = await prisma.transaction.findMany({
     where: {

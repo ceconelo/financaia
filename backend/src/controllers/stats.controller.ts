@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../services/finance.js';
+import { getCycleRange } from '../services/date.service.js';
 
 export const getStats = async (req: Request, res: Response) => {
     try {
@@ -15,9 +16,8 @@ export const getStats = async (req: Request, res: Response) => {
         const monthParam = req.query.month ? parseInt(req.query.month as string) : now.getMonth() + 1;
         const yearParam = req.query.year ? parseInt(req.query.year as string) : now.getFullYear();
 
-        // Calculate start and end dates for the selected month
-        const startDate = new Date(yearParam, monthParam - 1, 1);
-        const endDate = new Date(yearParam, monthParam, 0, 23, 59, 59, 999);
+        // Calculate start and end dates for the selected month using the centralized cycle logic
+        const { startDate, endDate } = getCycleRange(monthParam, yearParam);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);

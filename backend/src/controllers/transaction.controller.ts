@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../services/finance.js';
+import { getCycleRange } from '../services/date.service.js';
 
 export const getRecentTransactions = async (req: Request, res: Response) => {
     try {
@@ -100,9 +101,8 @@ export const resetTransactions = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Month e year são obrigatórios' });
         }
 
-        // Calculate start and end dates
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+        // Calculate start and end dates using the centralized cycle logic
+        const { startDate, endDate } = getCycleRange(month, year);
 
         let whereClause: any = {
             createdAt: {
@@ -150,9 +150,8 @@ export const getTransactions = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Month e year são obrigatórios' });
         }
 
-        // Calculate date range
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+        // Calculate date range using the centralized cycle logic
+        const { startDate, endDate } = getCycleRange(month, year);
 
         // Get total count
         const whereClause: any = {

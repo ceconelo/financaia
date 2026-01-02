@@ -1,5 +1,6 @@
 import { prisma } from './finance.js';
 import { randomBytes } from 'crypto';
+import { getCycleRange, getCurrentCycleInfo } from './date.service.js';
 
 export async function createFamilyGroup(userId: string, familyName?: string) {
   // Verificar se usuário já tem família
@@ -80,20 +81,8 @@ export async function getFamilyReport(userId: string) {
   }
 
   const familyId = user.familyGroup.id;
-  const now = new Date();
-  const day = now.getDate();
-  let startDate: Date;
-  let endDate: Date;
-
-  if (day <= 8) {
-    // Ciclo termina no dia 8 deste mês, começou no dia 9 do mês passado
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 9, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 8, 23, 59, 59);
-  } else {
-    // Ciclo começou no dia 9 deste mês, termina no dia 8 do mês que vem
-    startDate = new Date(now.getFullYear(), now.getMonth(), 9, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 8, 23, 59, 59);
-  }
+  const { month, year } = getCurrentCycleInfo();
+  const { startDate, endDate } = getCycleRange(month, year);
 
   // Buscar transações de todos os membros
   const transactions = await prisma.transaction.findMany({
